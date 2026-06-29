@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Submit Payment Proof — NegOr HS Hub</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="preload" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" as="style" onload="this.onload=null;this.rel='stylesheet'" />
+  <noscript><link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" /></noscript>
+  <link rel="stylesheet" href="tailwind.min.css" />
+  <style>
+    :root {
+      --t:     #B5451B;
+      --t-dk:  #8B3214;
+      --t-md:  #D4714E;
+      --t-lt:  #FEF3EE;
+      --t-pal: #F9DDD0;
+      --t-rng: rgba(181,69,27,.14);
+    }
+    body { font-family:'Inter',sans-serif; background:linear-gradient(150deg,#FEF3EE 0%,#fff 55%,#fdf5ef 100%); min-height:100vh; }
+    .label  { display:block; font-size:.8rem; font-weight:500; color:#374151; margin-bottom:.25rem; }
+    .inp    { width:100%; padding:.625rem 1rem; border:1px solid #d1d5db; border-radius:.625rem; font-size:.875rem; outline:none; background:white; transition:border-color .15s,box-shadow .15s; }
+    .inp:focus { border-color:var(--t); box-shadow:0 0 0 3px var(--t-rng); }
+    .field-err { border-color:#ef4444 !important; background:#fef2f2 !important; }
+    .btn-p { display:inline-flex; align-items:center; gap:.3rem; padding:.7rem 1.6rem; background:var(--t); color:#fff; border-radius:.75rem; font-size:.875rem; font-weight:600; border:none; cursor:pointer; transition:background .15s,transform .1s; }
+    .btn-p:hover { background:var(--t-dk); }
+    .btn-p:active { transform:scale(.97); }
+    .btn-p:disabled { opacity:.6; cursor:not-allowed; }
+    .upload-zone { border:2px dashed var(--t-md); border-radius:.75rem; padding:1.5rem; text-align:center; cursor:pointer; background:var(--t-lt); transition:border-color .15s,background .15s; }
+    .upload-zone:hover { border-color:var(--t); }
+    .upload-zone.ok { border-color:#16a34a; background:#f0fdf4; }
+  </style>
+</head>
+<body>
+
+<!-- ═══ HEADER ═══ -->
+<header class="bg-white shadow-sm sticky top-0 z-20" style="border-bottom:1px solid var(--t-pal)">
+  <div class="max-w-2xl mx-auto px-4 py-3 flex items-center gap-3">
+    <a href="index.html">
+      <img src="logo.webp" alt="NegOr Homeschoolers Hub" class="h-9 w-auto object-contain flex-shrink-0"
+           onerror="this.style.display='none'" />
+    </a>
+    <div>
+      <p class="font-bold leading-none" style="color:var(--t-dk)">NegOr HS Hub</p>
+      <p class="text-xs text-gray-400">Membership Payment Upload</p>
+    </div>
+  </div>
+</header>
+
+<div class="max-w-xl mx-auto px-4 py-10 pb-16">
+
+  <div id="err-banner" class="hidden mb-4 flex items-start gap-2 bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-700">
+    <svg class="w-4 h-4 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+    </svg>
+    <span id="err-txt"></span>
+  </div>
+
+  <!-- Form card -->
+  <div id="form-card" class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 md:p-8">
+    <div class="flex items-center gap-3 mb-1">
+      <div class="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style="background:var(--t-lt)">
+        <span class="text-xl">💳</span>
+      </div>
+      <div>
+        <h1 class="text-lg font-bold" style="color:var(--t-dk)">Submit Payment Proof</h1>
+        <p class="text-xs text-gray-400">Annual Membership Contribution · ₱200</p>
+      </div>
+    </div>
+
+    <p class="text-sm text-gray-500 mt-4 mb-6">
+      Use this form to upload your GCash / InstaPay proof of payment if you registered and chose to pay later.
+    </p>
+
+    <!-- Payment reminder -->
+    <div class="rounded-2xl p-5 mb-6" style="border:2px solid var(--t-md); background:var(--t-lt)">
+      <p class="text-sm font-bold mb-3" style="color:var(--t-dk)">Pay via GCash / InstaPay</p>
+      <div class="flex flex-col sm:flex-row items-center gap-5">
+        <div class="text-center flex-shrink-0">
+          <div class="bg-white rounded-xl border border-gray-200 p-2 inline-block">
+            <img src="payment-qr.png" alt="GCash / InstaPay QR"
+                 class="w-36 h-36 object-contain"
+                 onerror="this.outerHTML='<div class=\'w-36 h-36 flex items-center justify-center bg-gray-100 rounded-lg text-xs text-gray-400 text-center p-3\'>Save QR as<br/><strong>payment-qr.png</strong></div>'" />
+          </div>
+          <p class="text-xs text-gray-500 mt-1">GCash / InstaPay</p>
+          <p class="text-xs font-semibold mt-0.5" style="color:var(--t)">Debbie Uy Matiao</p>
+        </div>
+        <div class="flex-1 space-y-2 text-sm text-gray-700">
+          <div class="flex items-start gap-2"><span>1️⃣</span><span>Open GCash or any InstaPay app</span></div>
+          <div class="flex items-start gap-2"><span>2️⃣</span><span>Scan QR and send exactly <strong>₱200.00</strong></span></div>
+          <div class="flex items-start gap-2"><span>3️⃣</span><span>Screenshot the confirmation screen</span></div>
+          <div class="flex items-start gap-2"><span>4️⃣</span><span>Upload it below</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Fields -->
+    <div class="space-y-4">
+      <div>
+        <label class="label" for="family-name">Family Name <span class="text-red-500">*</span></label>
+        <input type="text" id="family-name" class="inp" placeholder="e.g., Santos, dela Cruz" required />
+      </div>
+      <div>
+        <label class="label" for="family-id">Family ID <span class="text-gray-400 font-normal">(from your registration confirmation)</span></label>
+        <input type="text" id="family-id" class="inp" placeholder="e.g., FAM-2026-0001" />
+        <p class="text-xs text-gray-400 mt-1">Check your registration confirmation for your Family ID. Leave blank if you don't have it.</p>
+      </div>
+      <div>
+        <label class="label" for="contact-email">Email / Contact Number <span class="text-red-500">*</span></label>
+        <input type="text" id="contact-email" class="inp" placeholder="Email address or phone number" required />
+        <p class="text-xs text-gray-400 mt-1">So we can confirm your payment with the right family.</p>
+      </div>
+      <div>
+        <label class="label">Proof of Payment <span class="text-red-500">*</span></label>
+        <div id="upload-zone" class="upload-zone" onclick="document.getElementById('payment-file').click()">
+          <svg id="upload-icon" class="w-8 h-8 mx-auto mb-2" style="color:var(--t-md)"
+               fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                  d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
+          </svg>
+          <p id="upload-lbl" class="text-sm font-medium" style="color:var(--t)">Click to upload your payment screenshot</p>
+          <p class="text-xs text-gray-400 mt-1">JPG, PNG, or PDF · Max 5 MB</p>
+        </div>
+        <input type="file" id="payment-file" accept="image/*,application/pdf" class="hidden" onchange="onFileSelect(this)" />
+      </div>
+    </div>
+
+    <div class="mt-8 flex justify-end">
+      <button type="button" id="submit-btn" class="btn-p" onclick="submitPayment()">
+        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+        </svg>
+        Submit Payment
+      </button>
+    </div>
+  </div>
+
+  <!-- Success -->
+  <div id="success-screen" class="hidden bg-white rounded-2xl shadow-sm border border-gray-100 p-8 text-center">
+    <div class="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+      <svg class="w-8 h-8 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/>
+      </svg>
+    </div>
+    <h2 class="text-xl font-bold mb-2" style="color:var(--t-dk)">Payment Proof Submitted!</h2>
+    <p class="text-gray-600 text-sm mb-1">Thank you! Our Finance Team will verify your payment and update your membership status.</p>
+    <p class="text-gray-500 text-xs mb-5">This usually takes 1–2 business days.</p>
+    <a href="index.html" class="inline-block text-sm font-medium" style="color:var(--t)">← Back to Hub</a>
+  </div>
+
+</div>
+
+<!-- ═══ FOOTER ═══ -->
+<footer class="mt-4 py-8 border-t border-gray-100 bg-white">
+  <div class="max-w-4xl mx-auto px-4 text-center">
+    <img src="logo.webp" alt="NegOr Homeschoolers Hub" class="h-10 mx-auto mb-3 object-contain"
+         onerror="this.style.display='none'" />
+    <p class="text-xs text-gray-400 mb-3">Negros Oriental Homeschoolers Hub · Est. 2023</p>
+    <div class="flex items-center justify-center gap-6 text-xs">
+      <a href="https://www.facebook.com/groups/negorhshubofficial" target="_blank" rel="noopener"
+         class="flex items-center gap-1.5 text-gray-500 hover:text-[#B5451B] transition-colors">
+        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
+        NegOr HS Hub Official
+      </a>
+      <a href="https://www.instagram.com/negorhshub" target="_blank" rel="noopener"
+         class="flex items-center gap-1.5 text-gray-500 hover:text-[#B5451B] transition-colors">
+        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z"/></svg>
+        @negorhshub
+      </a>
+    </div>
+  </div>
+</footer>
+
+<script>
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyAccFyFzcNgGN2FdiyACxSBvTxIdVy3M0lPSEsph17vrhzzY5cbFvQGDCTQXtSK_G__w/exec';
+
+function onFileSelect(input) {
+  const f = input.files[0]; if (!f) return;
+  if (f.size > 5*1024*1024) {
+    showErr('File too large. Please upload a file under 5 MB.');
+    input.value = ''; return;
+  }
+  document.getElementById('upload-zone').classList.add('ok');
+  document.getElementById('upload-lbl').innerHTML =
+    `✅ <strong>${f.name}</strong> (${(f.size/1024).toFixed(0)} KB) — ready`;
+}
+
+async function toBase64(file) {
+  return new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload  = () => res(r.result.split(',')[1]);
+    r.onerror = rej;
+    r.readAsDataURL(file);
+  });
+}
+
+async function submitPayment() {
+  const familyName = document.getElementById('family-name').value.trim();
+  const familyId   = document.getElementById('family-id').value.trim();
+  const contact    = document.getElementById('contact-email').value.trim();
+  const fileInput  = document.getElementById('payment-file');
+
+  if (!familyName) { showErr('Please enter your family name.'); return; }
+  if (!contact)    { showErr('Please enter your email or contact number.'); return; }
+  if (!fileInput.files || fileInput.files.length === 0) {
+    showErr('Please upload your proof of payment.');
+    document.getElementById('upload-zone').scrollIntoView({ behavior:'smooth', block:'center' });
+    return;
+  }
+
+  const btn = document.getElementById('submit-btn');
+  btn.disabled = true;
+  btn.innerHTML = `<svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+  </svg> Submitting…`;
+
+  let base64 = '';
+  try {
+    const file = fileInput.files[0];
+    base64 = await toBase64(file);
+    const payload = {
+      _type:      'submitPaymentProof',
+      familyName,
+      familyId,
+      contact,
+      paymentProof: { name:file.name, mimeType:file.type, base64 },
+    };
+    const res  = await fetch(APPS_SCRIPT_URL, {
+      method:'POST', headers:{'Content-Type':'text/plain'}, body:JSON.stringify(payload)
+    });
+    const data = await res.json();
+    if (data.success) {
+      document.getElementById('form-card').classList.add('hidden');
+      document.getElementById('err-banner').classList.add('hidden');
+      document.getElementById('success-screen').classList.remove('hidden');
+      window.scrollTo({ top:0, behavior:'smooth' });
+    } else { throw new Error(data.error || 'Submission failed'); }
+  } catch(err) {
+    btn.disabled = false;
+    btn.innerHTML = `<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+      Submit Payment`;
+    showErr('Could not reach the server. Check your connection and try again.');
+    console.error(err);
+  }
+}
+
+function showErr(m) {
+  document.getElementById('err-txt').textContent = m;
+  document.getElementById('err-banner').classList.remove('hidden');
+  setTimeout(() => document.getElementById('err-banner').classList.add('hidden'), 7000);
+}
+</script>
+
+</body>
+</html>

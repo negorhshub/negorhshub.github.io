@@ -435,8 +435,25 @@
         </div>
       </div>
 
+      <!-- Pay Later option -->
+      <div class="mt-4">
+        <label class="flex items-start gap-2.5 cursor-pointer">
+          <input type="checkbox" id="pay-later-check" onchange="toggleRegPayLater()"
+                 class="mt-0.5 flex-shrink-0" style="accent-color:var(--t)" />
+          <span class="text-sm text-gray-700 leading-snug">
+            <strong>I will pay later</strong> — skip the upload for now and submit proof of payment separately.
+          </span>
+        </label>
+        <div id="pay-later-note" class="hidden mt-3 rounded-xl px-4 py-3 text-sm" style="background:var(--t-pal); border:1px solid var(--t-md)">
+          <p class="font-semibold mb-1" style="color:var(--t-dk)">📌 How to pay later</p>
+          <p class="text-gray-700 text-xs leading-relaxed">After submitting, use the QR code above to send <strong>₱200</strong> via GCash / InstaPay. Then go to
+            <a href="payment-submit.html" target="_blank" class="font-semibold underline" style="color:var(--t)">Payment Upload</a>
+            to submit your proof using your Family ID (shown on your confirmation).</p>
+        </div>
+      </div>
+
       <!-- File upload -->
-      <div class="mt-5">
+      <div id="proof-section" class="mt-5">
         <label class="label">Upload Proof of Payment <span class="text-red-500">*</span></label>
         <div id="upload-zone" class="upload-zone" onclick="document.getElementById('payment-file').click()">
           <svg id="upload-icon" class="w-8 h-8 mx-auto mb-2" style="color:var(--t-md)"
@@ -485,7 +502,7 @@
 <!-- ═══════════════ SCRIPT ═══════════════ -->
 <script>
 // ── CONFIG ────────────────────────────────────────────────────
-const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyAccFyFzcNgGN2FdiyACxSBvTxIdVy3M0lPSEsph17vrhzzY5cbFvQGDCTQXtSK_G__w/exec';
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzqK95VnVUauW9oSRSW6mUTIaD5cxB0aCxMa2PwvxHgJKisM6dVbzJRUs8-YgtglbJhUA/exec';
 
 // ── LISTS ─────────────────────────────────────────────────────
 const ACTIVITIES = [
@@ -850,13 +867,20 @@ function collect() {
 }
 
 // ── SUBMISSION ────────────────────────────────────────────────
+function toggleRegPayLater() {
+  const payLater = document.getElementById('pay-later-check').checked;
+  document.getElementById('proof-section').style.display = payLater ? 'none' : '';
+  document.getElementById('pay-later-note').classList.toggle('hidden', !payLater);
+}
+
 async function submitForm() {
   if (!document.getElementById('consent-data').checked) {
     showErr('You must agree to the Personal Data Collection Consent to submit.'); return;
   }
+  const payLater  = document.getElementById('pay-later-check')?.checked || false;
   const fileInput = document.getElementById('payment-file');
-  if (!fileInput.files || fileInput.files.length===0) {
-    showErr('Please upload your proof of payment before submitting.');
+  if (!payLater && (!fileInput.files || fileInput.files.length===0)) {
+    showErr('Please upload your proof of payment, or tick "I will pay later" to submit without it.');
     document.getElementById('upload-zone').scrollIntoView({behavior:'smooth', block:'center'});
     return;
   }
@@ -869,13 +893,16 @@ async function submitForm() {
   </svg> Submitting…`;
 
   const payload = collect();
+  payload.payLater = payLater;
 
-  try {
-    const file = fileInput.files[0];
-    payload.paymentProof = { name:file.name, mimeType:file.type, base64: await toBase64(file) };
-  } catch(e) {
-    showErr('Could not read the uploaded file. Please try again.');
-    resetBtn(btn); return;
+  if (!payLater && fileInput.files && fileInput.files.length > 0) {
+    try {
+      const file = fileInput.files[0];
+      payload.paymentProof = { name:file.name, mimeType:file.type, base64: await toBase64(file) };
+    } catch(e) {
+      showErr('Could not read the uploaded file. Please try again.');
+      resetBtn(btn); return;
+    }
   }
 
   try {

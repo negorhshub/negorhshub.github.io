@@ -215,20 +215,9 @@
         </div>
       </div>
 
-      <!-- Pay Later option -->
-      <div id="pay-later-wrap" class="mt-4 mb-1">
-        <label class="flex items-start gap-2.5 cursor-pointer">
-          <input type="checkbox" id="pay-later-check" onchange="togglePayLater()"
-                 class="mt-0.5 accent-amber-600 flex-shrink-0" />
-          <span class="text-sm text-gray-700 leading-snug">
-            <strong>I will pay at the event</strong> — skip proof upload for now. Payment will be settled on the day.
-          </span>
-        </label>
-      </div>
-
-      <!-- Upload (hidden when pay-later or fee=0) -->
+      <!-- Upload (hidden when fee=0) -->
       <div id="proof-section" class="mt-5">
-        <label class="label">Upload Proof of Payment <span class="text-red-500" id="proof-required-star">*</span></label>
+        <label class="label">Upload Proof of Payment <span class="text-red-500">*</span></label>
         <div id="upload-zone" class="upload-zone" onclick="document.getElementById('payment-file').click()">
           <svg id="upload-icon" class="w-8 h-8 mx-auto mb-2" style="color:#d97706"
                fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -242,23 +231,23 @@
       </div>
     </div>
 
-    <!-- Excess handling -->
+    <!-- Excess funds allocation -->
     <div class="mb-6">
-      <p class="text-sm font-semibold text-gray-700 mb-1">💰 If You Overpaid or Have Remaining Balance</p>
-      <p class="text-xs text-gray-400 mb-3">What would you like us to do with any excess?</p>
+      <p class="text-sm font-semibold text-gray-700 mb-1">💰 Excess Funds Allocation</p>
+      <p class="text-xs text-gray-500 mb-3">If the total contributions collected for this event exceed the actual expenses, what would you like us to do with your share of the surplus?</p>
       <div class="space-y-2">
         <label class="radio-card">
-          <input type="radio" name="excess" value="refund" checked />
+          <input type="radio" name="excess" value="community-fund" checked />
           <div>
-            <p class="text-sm font-medium text-gray-800">Refund to me</p>
-            <p class="text-xs text-gray-500">We'll coordinate with you to return any excess amount.</p>
+            <p class="text-sm font-medium text-gray-800">YES, I approve the allocation to the Community Fund.</p>
+            <p class="text-xs text-gray-500">My share of any surplus goes toward shared community needs and future activities. 🙏</p>
           </div>
         </label>
         <label class="radio-card">
-          <input type="radio" name="excess" value="community-fund" />
+          <input type="radio" name="excess" value="refund" />
           <div>
-            <p class="text-sm font-medium text-gray-800">Donate to the Community Fund</p>
-            <p class="text-xs text-gray-500">Your excess goes toward shared community needs and future activities. 🙏</p>
+            <p class="text-sm font-medium text-gray-800">No, I prefer to receive my share of the excess funds.</p>
+            <p class="text-xs text-gray-500">We'll coordinate with you to return your proportional share of any surplus.</p>
           </div>
         </label>
       </div>
@@ -382,7 +371,7 @@
 <!-- ═══════════════ SCRIPT ═══════════════ -->
 <script>
 // ─── APPS SCRIPT URL ────────────────────────────────────────
-const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyAccFyFzcNgGN2FdiyACxSBvTxIdVy3M0lPSEsph17vrhzzY5cbFvQGDCTQXtSK_G__w/exec';
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzqK95VnVUauW9oSRSW6mUTIaD5cxB0aCxMa2PwvxHgJKisM6dVbzJRUs8-YgtglbJhUA/exec';
 
 // ─── STATE ─────────────────────────────────────────────────
 let step = 1, pCount = 0, cCount = 0;
@@ -764,7 +753,7 @@ function buildReview() {
     ['Parents/Guardians',  parents.join(', ')||'—'],
     children.length ? ['Children Attending', children.join(', ')] : null,
     ['Registration Fee', `${EVENT.feeLabel} — Total: ₱${(EVENT.totalFee ?? EVENT.fee).toLocaleString()}`],
-    ['If Overpaid',        excess==='community-fund' ? 'Donate to Community Fund' : 'Refund to me'],
+    ['Excess Funds',       excess==='community-fund' ? 'Approved — allocate to Community Fund' : 'Return my share of excess funds'],
     volAmt ? ['Voluntary Contribution', '₱'+parseInt(volAmt).toLocaleString()] : null,
     ['Role at Event',      orgRole==='organizer'?'Organizing / Coordinating Team' : orgRole==='volunteer'?'Day-of Volunteer':'Attendee'],
   ].filter(Boolean);
@@ -801,33 +790,22 @@ function collect() {
 }
 
 // ─── SUBMISSION ──────────────────────────────────────────────
-function togglePayLater() {
-  const payLater  = document.getElementById('pay-later-check').checked;
-  const proofSec  = document.getElementById('proof-section');
-  if (proofSec) proofSec.style.display = payLater ? 'none' : '';
-}
 
 function updateProofRequired() {
-  // Hide proof upload if fee is 0
+  // Hide proof upload if event is free
   const fee      = EVENT ? (parseFloat(EVENT.fee) || 0) : 1;
   const proofSec = document.getElementById('proof-section');
-  const plWrap   = document.getElementById('pay-later-wrap');
-  if (fee === 0) {
-    if (proofSec) proofSec.style.display = 'none';
-    if (plWrap)   plWrap.style.display   = 'none';
-  }
+  if (fee === 0 && proofSec) proofSec.style.display = 'none';
 }
 
 async function submitForm() {
   if (!document.getElementById('consent-data').checked) {
     showErr('Please agree to the data consent before submitting.'); return;
   }
-  const payLater  = document.getElementById('pay-later-check')?.checked || false;
   const fee       = EVENT ? (parseFloat(EVENT.fee) || 0) : 0;
-  const needProof = !payLater && fee > 0;
   const fileInput = document.getElementById('payment-file');
-  if (needProof && (!fileInput.files || fileInput.files.length===0)) {
-    showErr('Please upload your proof of payment before submitting, or tick "I will pay at the event".');
+  if (fee > 0 && (!fileInput.files || fileInput.files.length===0)) {
+    showErr('Please upload your proof of payment before submitting.');
     document.getElementById('upload-zone').scrollIntoView({behavior:'smooth',block:'center'});
     return;
   }
@@ -840,9 +818,8 @@ async function submitForm() {
   </svg> Submitting…`;
 
   const payload = collect();
-  payload.payLater = payLater;
 
-  if (!payLater && fileInput.files && fileInput.files.length > 0) {
+  if (fileInput.files && fileInput.files.length > 0) {
     try {
       const file = fileInput.files[0];
       payload.paymentProof = { name:file.name, mimeType:file.type, base64: await toBase64(file) };
