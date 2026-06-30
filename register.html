@@ -371,19 +371,19 @@
       </label>
 
       <label class="ccard items-start">
-        <input type="checkbox" id="consent-photo" />
+        <input type="checkbox" id="consent-photo" required />
         <span class="text-sm text-gray-700 leading-snug">
           <strong>Photo &amp; Media Consent</strong> — I give permission for photos and videos taken during community
           events to include my family, and for these to be used or shared in our public Facebook group and other
-          social media accounts, highlights, recap infographics, and similar community materials.
+          social media accounts, highlights, recap infographics, and similar community materials. <span class="text-red-500">*</span>
         </span>
       </label>
 
       <label class="ccard items-start">
-        <input type="checkbox" id="consent-files" />
+        <input type="checkbox" id="consent-files" required />
         <span class="text-sm text-gray-700 leading-snug">
           <strong>File &amp; Photo Contribution Consent</strong> — I give permission for files, photos, and resources
-          I share with the community to be stored in the NegOr HS Hub shared Google Drive folder for community use.
+          I share with the community to be stored in the NegOr HS Hub shared Google Drive folder for community use. <span class="text-red-500">*</span>
         </span>
       </label>
     </div>
@@ -507,9 +507,13 @@ const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyAccFyFzcNgGN2
 // ── LISTS ─────────────────────────────────────────────────────
 const ACTIVITIES = [
   'January — The Great Homeschool Campout',
+  'February / March — Science Fair',
   'March 3 — National Homeschool Day Celebration',
+  'April — Field Trip',
   'June — Learners\' Day',
   'August 12 — Community Anniversary Celebration',
+  'September — Field Trip',
+  'November — KidPreneur',
   'November — Christmas Party',
   'December — Christmas Busking + Outreach',
 ];
@@ -876,6 +880,12 @@ function toggleRegPayLater() {
 async function submitForm() {
   if (!document.getElementById('consent-data').checked) {
     showErr('You must agree to the Personal Data Collection Consent to submit.'); return;
+  }
+  if (!document.getElementById('consent-photo').checked) {
+    showErr('You must agree to the Photo & Media Consent to submit.'); return;
+  }
+  if (!document.getElementById('consent-files').checked) {
+    showErr('You must agree to the File & Photo Contribution Consent to submit.'); return;
   }
   const payLater  = document.getElementById('pay-later-check')?.checked || false;
   const fileInput = document.getElementById('payment-file');
