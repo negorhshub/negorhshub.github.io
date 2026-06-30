@@ -263,7 +263,7 @@
       <div class="grid grid-cols-2 gap-3">
         <div>
           <label class="label">Amount (₱) <span class="text-gray-400 font-normal">if any</span></label>
-          <input type="number" id="vol-amount" class="inp" placeholder="e.g., 50" min="0" step="1" oninput="updatePaymentCard()" />
+          <input type="number" id="vol-amount" class="inp" placeholder="e.g., 50" min="0" step="1" />
         </div>
         <div>
           <label class="label">Where to put it?</label>
@@ -431,7 +431,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       startTime:        ev['start_time']         || '',
       endTime:          ev['end_time']           || '',
       venue:            ev['venue']              || '',
-      fee:              parseFloat(ev['fee_(₱)'] || ev['fee'] || 0),
+      fee:              parseFloat(ev['fee_₱'] || ev['fee_(₱)'] || ev['fee'] || 0),
       payeeName:        ev['payee_name']         || 'Debbie Uy Matiao',
       description:      ev['description']        || '',
       registrationType: ev['registration_type'] || 'per_family',
@@ -538,7 +538,7 @@ async function showEventPicker() {
           const title = ev['event_title'] || 'Untitled Event';
           const date  = ev['event_date']  ? fmtDate(ev['event_date']) : '';
           const venue = ev['venue']       || '';
-          const fee   = ev['fee_(₱)']    ? '₱' + parseFloat(ev['fee_(₱)']).toLocaleString() : 'Free';
+          const fee   = (ev['fee_₱']||ev['fee_(₱)']) ? '₱' + parseFloat(ev['fee_₱']||ev['fee_(₱)']).toLocaleString() : 'Free';
           return `
           <div onclick="window.location.search='?event=${id}'"
                class="bg-white border border-gray-200 rounded-2xl p-5 cursor-pointer hover:border-[#B5451B] hover:shadow-sm transition-all">
@@ -803,12 +803,10 @@ function collect() {
 // ─── SUBMISSION ──────────────────────────────────────────────
 
 function updatePaymentCard() {
-  // Show payment card (QR + disclaimer + proof upload) when fee > 0 OR voluntary > 0
-  const fee    = EVENT ? (parseFloat(EVENT.fee) || 0) : 1;
-  const volAmt = parseFloat(document.getElementById('vol-amount')?.value) || 0;
-  const show   = fee > 0 || volAmt > 0;
-  const card   = document.getElementById('payment-card');
-  if (card) card.style.display = show ? '' : 'none';
+  // Show payment card (QR + disclaimer + proof upload) only when event has a fee
+  const fee  = EVENT ? (parseFloat(EVENT.fee) || 0) : 1;
+  const card = document.getElementById('payment-card');
+  if (card) card.style.display = fee > 0 ? '' : 'none';
 }
 
 async function submitForm() {
@@ -816,8 +814,7 @@ async function submitForm() {
     showErr('Please agree to the data consent before submitting.'); return;
   }
   const fee       = EVENT ? (parseFloat(EVENT.fee) || 0) : 0;
-  const volAmt    = parseFloat(document.getElementById('vol-amount')?.value) || 0;
-  const needProof = fee > 0 || volAmt > 0;
+  const needProof = fee > 0;
   const fileInput = document.getElementById('payment-file');
   if (needProof && (!fileInput.files || fileInput.files.length===0)) {
     showErr('Please upload your proof of payment before submitting.');
