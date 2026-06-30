@@ -182,52 +182,55 @@
     <h2 class="text-xl font-bold text-gray-900">Payment</h2>
     <p class="text-sm text-gray-500 mt-1 mb-4">Complete your registration payment and upload your proof.</p>
 
-    <!-- Disclaimer -->
-    <div class="rounded-xl px-4 py-3 mb-5 flex items-start gap-2.5 text-sm"
-         style="background:#fef9c3; border:1px solid #fde047">
-      <span class="text-base leading-none mt-0.5">⚠️</span>
-      <p class="text-yellow-800 leading-snug">
-        <strong>Please note:</strong> Registration fees are <strong>non-refundable</strong> but are
-        <strong>transferable</strong> — another family member or community participant may take your slot.
-        Contact a coordinator if you need to make a transfer.
-      </p>
-    </div>
-
     <!-- Fee summary -->
     <div id="fee-summary" class="rounded-xl p-4 mb-6 text-sm" style="background:var(--ev-lt); border:1px solid var(--ev-pal)"></div>
 
-    <!-- QR + instructions -->
-    <div class="rounded-2xl p-5 mb-5" style="border:2px solid #d97706; background:var(--ev-lt)">
-      <p class="text-sm font-bold mb-1" style="color:var(--ev-dk)">💳 Send Your Payment via GCash / InstaPay</p>
-      <div class="flex flex-col sm:flex-row items-center gap-5 mt-3">
-        <div class="text-center flex-shrink-0">
-          <div class="bg-white rounded-xl border border-gray-200 p-2 inline-block">
-            <img id="payment-qr-img" alt="GCash / InstaPay QR" class="w-40 h-40 object-contain" src="" />
-          </div>
-          <p class="text-xs text-gray-500 mt-1">GCash / InstaPay</p>
-          <p id="payee-name-disp" class="text-xs font-semibold mt-0.5" style="color:var(--ev)"></p>
-        </div>
-        <div class="flex-1 space-y-2">
-          <div class="flex items-start gap-2 text-sm text-gray-700"><span>1️⃣</span><span>Open your GCash or InstaPay banking app</span></div>
-          <div class="flex items-start gap-2 text-sm text-gray-700"><span>2️⃣</span><span>Scan the QR and send the <strong>registration fee</strong> shown above</span></div>
-          <div class="flex items-start gap-2 text-sm text-gray-700"><span>3️⃣</span><span>Screenshot your successful transfer confirmation</span></div>
-          <div class="flex items-start gap-2 text-sm text-gray-700"><span>4️⃣</span><span>Upload the screenshot below</span></div>
-        </div>
+    <!-- Payment card: shown when event fee > 0 OR voluntary amount > 0 -->
+    <div id="payment-card">
+      <!-- Disclaimer -->
+      <div class="rounded-xl px-4 py-3 mb-5 flex items-start gap-2.5 text-sm"
+           style="background:#fef9c3; border:1px solid #fde047">
+        <span class="text-base leading-none mt-0.5">⚠️</span>
+        <p class="text-yellow-800 leading-snug">
+          <strong>Please note:</strong> Registration fees are <strong>non-refundable</strong> but are
+          <strong>transferable</strong> — another family member or community participant may take your slot.
+          Contact a coordinator if you need to make a transfer.
+        </p>
       </div>
 
-      <!-- Upload (hidden when fee=0) -->
-      <div id="proof-section" class="mt-5">
-        <label class="label">Upload Proof of Payment <span class="text-red-500">*</span></label>
-        <div id="upload-zone" class="upload-zone" onclick="document.getElementById('payment-file').click()">
-          <svg id="upload-icon" class="w-8 h-8 mx-auto mb-2" style="color:#d97706"
-               fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
-                  d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
-          </svg>
-          <p id="upload-lbl" class="text-sm font-medium" style="color:var(--ev)">Click to upload payment screenshot</p>
-          <p class="text-xs text-gray-400 mt-1">JPG, PNG, or PDF · Max 5 MB</p>
+      <!-- QR + instructions -->
+      <div class="rounded-2xl p-5 mb-5" style="border:2px solid #d97706; background:var(--ev-lt)">
+        <p class="text-sm font-bold mb-1" style="color:var(--ev-dk)">💳 Send Your Payment via GCash / InstaPay</p>
+        <div class="flex flex-col sm:flex-row items-center gap-5 mt-3">
+          <div class="text-center flex-shrink-0">
+            <div class="bg-white rounded-xl border border-gray-200 p-2 inline-block">
+              <img id="payment-qr-img" alt="GCash / InstaPay QR" class="w-40 h-40 object-contain" src="" />
+            </div>
+            <p class="text-xs text-gray-500 mt-1">GCash / InstaPay</p>
+            <p id="payee-name-disp" class="text-xs font-semibold mt-0.5" style="color:var(--ev)"></p>
+          </div>
+          <div class="flex-1 space-y-2">
+            <div class="flex items-start gap-2 text-sm text-gray-700"><span>1️⃣</span><span>Open your GCash or InstaPay banking app</span></div>
+            <div class="flex items-start gap-2 text-sm text-gray-700"><span>2️⃣</span><span>Scan the QR and send the <strong>amount shown above</strong></span></div>
+            <div class="flex items-start gap-2 text-sm text-gray-700"><span>3️⃣</span><span>Screenshot your successful transfer confirmation</span></div>
+            <div class="flex items-start gap-2 text-sm text-gray-700"><span>4️⃣</span><span>Upload the screenshot below</span></div>
+          </div>
         </div>
-        <input type="file" id="payment-file" accept="image/*,application/pdf" class="hidden" onchange="onFileSelect(this)" />
+
+        <!-- Proof of payment upload -->
+        <div class="mt-5">
+          <label class="label">Upload Proof of Payment <span class="text-red-500">*</span></label>
+          <div id="upload-zone" class="upload-zone" onclick="document.getElementById('payment-file').click()">
+            <svg id="upload-icon" class="w-8 h-8 mx-auto mb-2" style="color:#d97706"
+                 fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                    d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
+            </svg>
+            <p id="upload-lbl" class="text-sm font-medium" style="color:var(--ev)">Click to upload payment screenshot</p>
+            <p class="text-xs text-gray-400 mt-1">JPG, PNG, or PDF · Max 5 MB</p>
+          </div>
+          <input type="file" id="payment-file" accept="image/*,application/pdf" class="hidden" onchange="onFileSelect(this)" />
+        </div>
       </div>
     </div>
 
@@ -260,7 +263,7 @@
       <div class="grid grid-cols-2 gap-3">
         <div>
           <label class="label">Amount (₱) <span class="text-gray-400 font-normal">if any</span></label>
-          <input type="number" id="vol-amount" class="inp" placeholder="e.g., 50" min="0" step="1" />
+          <input type="number" id="vol-amount" class="inp" placeholder="e.g., 50" min="0" step="1" oninput="updatePaymentCard()" />
         </div>
         <div>
           <label class="label">Where to put it?</label>
@@ -446,12 +449,20 @@ document.addEventListener('DOMContentLoaded', async () => {
     ? (EVENT.endTime ? `${fmtTime(EVENT.startTime)} – ${fmtTime(EVENT.endTime)}` : fmtTime(EVENT.startTime))
     : '';
 
+  const feeStr = EVENT.fee > 0
+    ? '₱' + EVENT.fee.toLocaleString() + ' ' + (
+        EVENT.registrationType === 'per_adult' ? 'per adult' :
+        EVENT.registrationType === 'per_child' ? 'per child' :
+        EVENT.registrationType === 'per_pax'   ? 'per person' : 'per family')
+    : 'Free';
+
   document.getElementById('event-banner').innerHTML = `
     <p class="text-xs font-bold uppercase tracking-widest opacity-80 mb-1">You're registering for</p>
     <h2 class="text-xl font-extrabold leading-tight">${EVENT.title}</h2>
     <div class="mt-2 text-sm opacity-90 space-y-0.5">
       ${dateStr ? `<div>📅 ${dateStr}${timeStr ? '&nbsp;&nbsp;⏰ ' + timeStr : ''}</div>` : ''}
       ${EVENT.venue ? `<div>📍 ${EVENT.venue}</div>` : ''}
+      <div>💳 ${feeStr}</div>
     </div>`;
 
   // ── Important Reminders ──
@@ -459,8 +470,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('ev-desc-text').textContent = EVENT.description;
     document.getElementById('event-reminders').classList.remove('hidden');
   }
-  // Hide proof upload if this event is free
-  updateProofRequired();
+  // Show/hide payment card based on fee
+  updatePaymentCard();
 
   // ── Payment QR ──
   const qrImg = document.getElementById('payment-qr-img');
@@ -668,7 +679,7 @@ function updateFee() {
 function goNext(cur) {
   if (!validate(cur)) return;
   step = cur + 1;
-  if (step === 2) updateFee(); // recalculate when entering payment step
+  if (step === 2) { updateFee(); updatePaymentCard(); }
   show(step);
   if (step === 4) buildReview();
   top0();
@@ -791,11 +802,13 @@ function collect() {
 
 // ─── SUBMISSION ──────────────────────────────────────────────
 
-function updateProofRequired() {
-  // Hide proof upload if event is free
-  const fee      = EVENT ? (parseFloat(EVENT.fee) || 0) : 1;
-  const proofSec = document.getElementById('proof-section');
-  if (fee === 0 && proofSec) proofSec.style.display = 'none';
+function updatePaymentCard() {
+  // Show payment card (QR + disclaimer + proof upload) when fee > 0 OR voluntary > 0
+  const fee    = EVENT ? (parseFloat(EVENT.fee) || 0) : 1;
+  const volAmt = parseFloat(document.getElementById('vol-amount')?.value) || 0;
+  const show   = fee > 0 || volAmt > 0;
+  const card   = document.getElementById('payment-card');
+  if (card) card.style.display = show ? '' : 'none';
 }
 
 async function submitForm() {
@@ -803,8 +816,10 @@ async function submitForm() {
     showErr('Please agree to the data consent before submitting.'); return;
   }
   const fee       = EVENT ? (parseFloat(EVENT.fee) || 0) : 0;
+  const volAmt    = parseFloat(document.getElementById('vol-amount')?.value) || 0;
+  const needProof = fee > 0 || volAmt > 0;
   const fileInput = document.getElementById('payment-file');
-  if (fee > 0 && (!fileInput.files || fileInput.files.length===0)) {
+  if (needProof && (!fileInput.files || fileInput.files.length===0)) {
     showErr('Please upload your proof of payment before submitting.');
     document.getElementById('upload-zone').scrollIntoView({behavior:'smooth',block:'center'});
     return;

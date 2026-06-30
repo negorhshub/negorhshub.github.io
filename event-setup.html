@@ -488,7 +488,7 @@ function renderEvents() {
             ${ev['event_date']?'📅 '+fmtDate(ev['event_date']):''}
             ${ev['start_time']?' · ⏰ '+fmtTime(ev['start_time'])+(ev['end_time']?' – '+fmtTime(ev['end_time']):''):''}
             ${ev['venue']?'  📍 '+ev['venue']:''}
-            ${ev['fee_(₱)']?'  💳 ₱'+parseFloat(ev['fee_(₱)']).toLocaleString():''}
+            ${(ev['fee_₱']||ev['fee_(₱)']||ev['fee'])?'  💳 ₱'+parseFloat(ev['fee_₱']||ev['fee_(₱)']||ev['fee']).toLocaleString():''}
           </p>
           ${ev['description'] ? `<p class="text-xs text-gray-400 mt-1">${ev['description']}</p>` : ''}
           <p class="text-xs mt-2"><span class="font-semibold" style="color:var(--t)">${count}</span> <span class="text-gray-400">registration${count!=1?'s':''}</span>
@@ -569,13 +569,13 @@ function openEditEvent(eventId) {
   editEventId = eventId;
 
   // Fill form fields
-  document.getElementById('ne-title').value      = ev['event_title']       || '';
-  document.getElementById('ne-date').value       = ev['event_date']        || '';
-  document.getElementById('ne-start-time').value = ev['start_time']        || '';
-  document.getElementById('ne-end-time').value   = ev['end_time']          || '';
-  document.getElementById('ne-venue').value      = ev['venue']             || '';
-  document.getElementById('ne-fee').value        = ev['fee_(₱)']           || '';
-  document.getElementById('ne-reg-type').value   = ev['registration_type'] || 'per_family';
+  document.getElementById('ne-title').value      = ev['event_title']                              || '';
+  document.getElementById('ne-date').value       = ev['event_date']                               || '';
+  document.getElementById('ne-start-time').value = ev['start_time']                               || '';
+  document.getElementById('ne-end-time').value   = ev['end_time']                                 || '';
+  document.getElementById('ne-venue').value      = ev['venue']                                    || '';
+  document.getElementById('ne-fee').value        = ev['fee_₱'] ?? ev['fee_(₱)'] ?? ev['fee'] ?? '';
+  document.getElementById('ne-reg-type').value   = ev['registration_type']                        || 'per_family';
   document.getElementById('ne-payee').value      = ev['payee_name']        || '';
   document.getElementById('ne-photo-folder').value = ev['photo_folder_url'] || '';
   document.getElementById('ne-desc').value         = ev['description']      || '';
