@@ -424,6 +424,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Map sheet keys to EVENT object
     const ev = data.data;
+    console.log('Raw event data from server:', JSON.stringify(ev));
     EVENT = {
       id:               ev['event_id']          || eventId,
       title:            ev['event_title']        || 'Community Event',
@@ -432,6 +433,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       endTime:          ev['end_time']           || '',
       venue:            ev['venue']              || '',
       fee:              parseFloat(ev['fee_₱'] || ev['fee_(₱)'] || ev['fee'] || 0),
+      childFee:         parseFloat(ev['child_fee_₱'] || ev['child_fee'] || 0),
+      freeAgeMax:       parseInt(ev['free_age_max'] || 0) || 0,
       payeeName:        ev['payee_name']         || 'Debbie Uy Matiao',
       description:      ev['description']        || '',
       registrationType: ev['registration_type'] || 'per_family',
@@ -449,18 +452,22 @@ document.addEventListener('DOMContentLoaded', async () => {
     ? (EVENT.endTime ? `${fmtTime(EVENT.startTime)} – ${fmtTime(EVENT.endTime)}` : fmtTime(EVENT.startTime))
     : '';
 
-  const feeStr = EVENT.fee > 0
-    ? '₱' + EVENT.fee.toLocaleString() + ' ' + (
-        EVENT.registrationType === 'per_adult' ? 'per adult' :
-        EVENT.registrationType === 'per_child' ? 'per child' :
-        EVENT.registrationType === 'per_pax'   ? 'per person' : 'per family')
+  const feeStr = (EVENT.fee > 0 || EVENT.childFee > 0)
+    ? (EVENT.registrationType === 'adult_child_split'
+        ? '₱' + EVENT.fee.toLocaleString() + ' per adult / ₱' + EVENT.childFee.toLocaleString() + ' per child'
+          + (EVENT.freeAgeMax > 0 ? ' (age ' + EVENT.freeAgeMax + ' &amp; under free)' : '')
+        : '₱' + EVENT.fee.toLocaleString() + ' ' + (
+            EVENT.registrationType === 'per_adult' ? 'per adult' :
+            EVENT.registrationType === 'per_child' ? 'per child' :
+            EVENT.registrationType === 'per_pax'   ? 'per person' : 'per family'))
     : 'Free';
 
   document.getElementById('event-banner').innerHTML = `
     <p class="text-xs font-bold uppercase tracking-widest opacity-80 mb-1">You're registering for</p>
     <h2 class="text-xl font-extrabold leading-tight">${EVENT.title}</h2>
     <div class="mt-2 text-sm opacity-90 space-y-0.5">
-      ${dateStr ? `<div>📅 ${dateStr}${timeStr ? '&nbsp;&nbsp;⏰ ' + timeStr : ''}</div>` : ''}
+      ${dateStr ? `<div>📅 ${dateStr}</div>` : ''}
+      ${timeStr ? `<div>⏰ ${timeStr}</div>` : ''}
       ${EVENT.venue ? `<div>📍 ${EVENT.venue}</div>` : ''}
       <div>💳 ${feeStr}</div>
     </div>`;
@@ -657,6 +664,28 @@ function updateFee() {
       desc  = `₱${EVENT.fee.toLocaleString()} × ${adults + kids} pax`;
       label = `₱${EVENT.fee.toLocaleString()} per person`;
       break;
+    case 'adult_child_split': {
+      const freeMax  = EVENT.freeAgeMax || 0;
+      const childFee = EVENT.childFee   || 0;
+      const childEls = [...document.querySelectorAll('#children-wrap > div')];
+      let paidKids = 0, freeKids = 0;
+      childEls.forEach(d => {
+        const age = parseInt(d.querySelector('[name="c_age"]')?.value) || 0;
+        if (freeMax > 0 && age <= freeMax) freeKids++;
+        else paidKids++;
+      });
+      const adultTotal = EVENT.fee * adults;
+      const kidTotal   = childFee * paidKids;
+      total = adultTotal + kidTotal;
+      const parts = [];
+      if (adults   > 0) parts.push(`₱${EVENT.fee.toLocaleString()} × ${adults} adult${adults !== 1 ? 's' : ''} = ₱${adultTotal.toLocaleString()}`);
+      if (paidKids > 0) parts.push(`₱${childFee.toLocaleString()} × ${paidKids} child${paidKids !== 1 ? 'ren' : ''} = ₱${kidTotal.toLocaleString()}`);
+      if (freeKids > 0) parts.push(`${freeKids} child${freeKids !== 1 ? 'ren' : ''} (age ${freeMax} &amp; under) — Free`);
+      if (parts.length === 0) parts.push('No attendees added yet');
+      desc  = parts.join('<br>');
+      label = `₱${EVENT.fee.toLocaleString()} adult / ₱${childFee.toLocaleString()} child${freeMax > 0 ? ` (≤${freeMax} free)` : ''}`;
+      break;
+    }
     default: // per_family
       total = EVENT.fee;
       desc  = 'Flat fee per family';
@@ -803,8 +832,8 @@ function collect() {
 // ─── SUBMISSION ──────────────────────────────────────────────
 
 function updatePaymentCard() {
-  // Show payment card (QR + disclaimer + proof upload) only when event has a fee
-  const fee  = EVENT ? (parseFloat(EVENT.fee) || 0) : 1;
+  // Show payment card if the event has any fee at all (adult or child)
+  const fee  = EVENT ? ((parseFloat(EVENT.fee) || 0) + (parseFloat(EVENT.childFee) || 0)) : 1;
   const card = document.getElementById('payment-card');
   if (card) card.style.display = fee > 0 ? '' : 'none';
 }
@@ -813,7 +842,8 @@ async function submitForm() {
   if (!document.getElementById('consent-data').checked) {
     showErr('Please agree to the data consent before submitting.'); return;
   }
-  const fee       = EVENT ? (parseFloat(EVENT.fee) || 0) : 0;
+  // Use computed totalFee if available (accounts for free-age children); fall back to base fee
+  const fee       = EVENT ? (EVENT.totalFee !== undefined ? EVENT.totalFee : (parseFloat(EVENT.fee) || 0)) : 0;
   const needProof = fee > 0;
   const fileInput = document.getElementById('payment-file');
   if (needProof && (!fileInput.files || fileInput.files.length===0)) {

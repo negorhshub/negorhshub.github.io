@@ -198,17 +198,35 @@
 
           <!-- Fee and Registration Type -->
           <div>
-            <label class="label">Registration Fee (₱) <span class="text-red-500">*</span></label>
+            <label class="label" id="ne-fee-label">Registration Fee (₱) <span class="text-red-500">*</span></label>
             <input id="ne-fee" type="number" class="inp" placeholder="e.g., 200" min="0" />
           </div>
           <div>
             <label class="label">Fee is charged</label>
-            <select id="ne-reg-type" class="inp bg-white">
+            <select id="ne-reg-type" class="inp bg-white" onchange="onRegTypeChange()">
               <option value="per_family">Per family (flat fee)</option>
               <option value="per_adult">Per adult</option>
               <option value="per_child">Per child</option>
               <option value="per_pax">Per person (adults + children)</option>
+              <option value="adult_child_split">Different rates for adults &amp; children</option>
             </select>
+          </div>
+
+          <!-- Split pricing fields — shown only for adult_child_split -->
+          <div id="ne-split-fields" class="sm:col-span-2 hidden">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 rounded-xl p-4" style="background:#fffbeb;border:1px solid #fcd34d">
+              <div>
+                <label class="label">Child Fee (₱) <span class="text-red-500">*</span></label>
+                <input id="ne-child-fee" type="number" class="inp" placeholder="e.g., 80" min="0" />
+              </div>
+              <div>
+                <label class="label">Free for children aged ___ &amp; under <span class="text-gray-400 font-normal">(0 = no free tier)</span></label>
+                <input id="ne-free-age-max" type="number" class="inp" placeholder="e.g., 6" min="0" max="17" value="0" />
+              </div>
+              <p class="sm:col-span-2 text-xs" style="color:#92400e">
+                ℹ️ The <strong>Registration Fee</strong> above becomes the <strong>adult fee</strong>. Children at or below the free-age threshold attend for free but are still counted.
+              </p>
+            </div>
           </div>
 
           <!-- Payee -->
@@ -574,12 +592,15 @@ function openEditEvent(eventId) {
   document.getElementById('ne-start-time').value = ev['start_time']                               || '';
   document.getElementById('ne-end-time').value   = ev['end_time']                                 || '';
   document.getElementById('ne-venue').value      = ev['venue']                                    || '';
-  document.getElementById('ne-fee').value        = ev['fee_₱'] ?? ev['fee_(₱)'] ?? ev['fee'] ?? '';
-  document.getElementById('ne-reg-type').value   = ev['registration_type']                        || 'per_family';
-  document.getElementById('ne-payee').value      = ev['payee_name']        || '';
-  document.getElementById('ne-photo-folder').value = ev['photo_folder_url'] || '';
-  document.getElementById('ne-desc').value         = ev['description']      || '';
+  document.getElementById('ne-fee').value           = ev['fee_₱'] ?? ev['fee_(₱)'] ?? ev['fee'] ?? '';
+  document.getElementById('ne-reg-type').value      = ev['registration_type']  || 'per_family';
+  document.getElementById('ne-child-fee').value     = ev['child_fee_₱'] || ev['child_fee'] || '';
+  document.getElementById('ne-free-age-max').value  = ev['free_age_max'] ?? 0;
+  document.getElementById('ne-payee').value          = ev['payee_name']        || '';
+  document.getElementById('ne-photo-folder').value  = ev['photo_folder_url'] || '';
+  document.getElementById('ne-desc').value           = ev['description']      || '';
   qrFileData = null; // don't re-upload existing QR unless a new one is chosen
+  onRegTypeChange(); // show/hide split fields based on loaded type
 
   // Switch form to edit mode
   document.querySelector('#new-event-form h3').textContent = `Edit Event: ${ev['event_title'] || eventId}`;
@@ -597,6 +618,9 @@ async function saveNewEvent() {
   const date     = (document.getElementById('ne-date')?.value   || '').trim();
   const venue    = (document.getElementById('ne-venue')?.value  || '').trim();
   const feeRaw       = (document.getElementById('ne-fee')?.value          || '').trim();
+  const regType      = (document.getElementById('ne-reg-type')?.value     || 'per_family');
+  const childFeeRaw  = (document.getElementById('ne-child-fee')?.value    || '').trim();
+  const freeAgeMax   = parseInt(document.getElementById('ne-free-age-max')?.value || '0') || 0;
   const payee        = (document.getElementById('ne-payee')?.value        || '').trim();
   const desc         = (document.getElementById('ne-desc')?.value         || '').trim();
   const photoFolder  = (document.getElementById('ne-photo-folder')?.value || '').trim();
@@ -607,6 +631,7 @@ async function saveNewEvent() {
   if (!date)         return showErr('Event date is required.');
   if (!venue)        return showErr('Venue is required.');
   if (feeRaw === '') return showErr('Registration fee is required. Enter 0 for free events.');
+  if (regType === 'adult_child_split' && childFeeRaw === '') return showErr('Child fee is required for split pricing. Enter 0 if children are free.');
 
   const saveBtn = document.getElementById('ne-save-btn');
   if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = 'Saving…'; }
@@ -621,7 +646,9 @@ async function saveNewEvent() {
         startTime:        (document.getElementById('ne-start-time')?.value || ''),
         endTime:          (document.getElementById('ne-end-time')?.value   || ''),
         fee:              parseFloat(feeRaw) || 0,
-        registrationType: (document.getElementById('ne-reg-type')?.value  || 'per_family'),
+        registrationType: regType,
+        childFee:         regType === 'adult_child_split' ? (parseFloat(childFeeRaw) || 0) : 0,
+        freeAgeMax:       regType === 'adult_child_split' ? freeAgeMax : 0,
         payeeName:        payee,
         description:      desc,
         photoFolderUrl:   photoFolder,
@@ -634,7 +661,9 @@ async function saveNewEvent() {
         startTime:        (document.getElementById('ne-start-time')?.value || ''),
         endTime:          (document.getElementById('ne-end-time')?.value   || ''),
         fee:              parseFloat(feeRaw) || 0,
-        registrationType: (document.getElementById('ne-reg-type')?.value  || 'per_family'),
+        registrationType: regType,
+        childFee:         regType === 'adult_child_split' ? (parseFloat(childFeeRaw) || 0) : 0,
+        freeAgeMax:       regType === 'adult_child_split' ? freeAgeMax : 0,
         payeeName:        payee,
         description:      desc,
         photoFolderUrl:   photoFolder,
@@ -644,13 +673,16 @@ async function saveNewEvent() {
 
     if (resp.success) {
       // Reset form
-      ['ne-title','ne-date','ne-start-time','ne-end-time','ne-venue','ne-fee','ne-photo-folder','ne-desc'].forEach(id => {
+      ['ne-title','ne-date','ne-start-time','ne-end-time','ne-venue','ne-fee','ne-child-fee','ne-photo-folder','ne-desc'].forEach(id => {
         const el = document.getElementById(id); if (el) el.value = '';
       });
+      const freeAgeEl = document.getElementById('ne-free-age-max');
+      if (freeAgeEl) freeAgeEl.value = '0';
       const payeeEl = document.getElementById('ne-payee');
       if (payeeEl) payeeEl.value = 'Debbie Uy Matiao';
       const regTypeEl = document.getElementById('ne-reg-type');
       if (regTypeEl) regTypeEl.value = 'per_family';
+      onRegTypeChange(); // hide split fields
       qrFileData = null;
       editEventId = null;
       document.getElementById('ne-qr-preview').classList.add('hidden');
@@ -667,6 +699,20 @@ async function saveNewEvent() {
     showErr('Network error: ' + e.message);
   } finally {
     if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = isEdit ? 'Update Event' : 'Save as Draft'; }
+  }
+}
+
+// ── REG TYPE CHANGE ──────────────────────────────────────────
+function onRegTypeChange() {
+  const type       = document.getElementById('ne-reg-type').value;
+  const splitFields = document.getElementById('ne-split-fields');
+  const feeLabel   = document.getElementById('ne-fee-label');
+  if (type === 'adult_child_split') {
+    splitFields.classList.remove('hidden');
+    feeLabel.innerHTML = 'Adult Fee (₱) <span class="text-red-500">*</span>';
+  } else {
+    splitFields.classList.add('hidden');
+    feeLabel.innerHTML = 'Registration Fee (₱) <span class="text-red-500">*</span>';
   }
 }
 
