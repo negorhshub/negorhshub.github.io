@@ -571,24 +571,26 @@ function onQrSelect(input) {
 
   (async () => {
     try {
-      // Shrink the QR to a small PNG so the base64 data URI stays well under
+      // Compress the QR until the base64 data URI fits comfortably inside
       // Google Sheets' 50,000-character-per-cell limit.
-      const dataUri = await shrinkImage(f, 400);
-      const base64  = dataUri.split(',')[1];
+      const result = await compressToFit(f, 44000);
 
-      if (dataUri.length > 45000) {
+      if (!result) {
         qrUploadedUrl = null;
-        zone.innerHTML = `<p class="text-sm font-medium text-red-600">❌ Image too complex to store</p>
-                          <p class="text-xs text-gray-400 mt-1">Try cropping tighter around just the QR square, then re-upload.</p>`;
+        zone.innerHTML = `<p class="text-sm font-medium text-red-600">❌ Could not compress this image enough</p>
+                          <p class="text-xs text-gray-400 mt-1">Crop tightly around just the QR square and re-upload.</p>`;
         return;
       }
+
+      const { dataUri, mimeType, width } = result;
+      const base64 = dataUri.split(',')[1];
 
       const resp = await post({
         _type: 'uploadPhoto',
         _token: coordToken,
         category: 'qr',
         base64,
-        mimeType: 'image/png',
+        mimeType,
         fileName: f.name.replace(/\.[^.]+$/, ''),
       });
 
@@ -596,7 +598,7 @@ function onQrSelect(input) {
         qrUploadedUrl = resp.url;
         const kb = Math.round(dataUri.length / 1024);
         zone.innerHTML = `<p class="text-sm font-medium text-green-700">✅ QR uploaded — ${f.name}</p>
-                          <p class="text-xs text-gray-400 mt-1">${kb} KB stored · Click to change</p>`;
+                          <p class="text-xs text-gray-400 mt-1">${width}px · ${kb} KB · Click to change</p>`;
       } else {
         qrUploadedUrl = null;
         zone.innerHTML = `<p class="text-sm font-medium text-red-600">❌ Upload failed — ${resp.error || 'unknown error'}</p>
@@ -610,34 +612,65 @@ function onQrSelect(input) {
   })();
 }
 
-// Downscale an image file to maxDim (longest side) and return a PNG data URI.
-// Keeps QR codes crisp while making the encoded size small enough to store in a sheet cell.
-function shrinkImage(file, maxDim) {
+// Load an image file into an <img> element.
+function loadImage(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onerror = () => reject(new Error('could not read file'));
     reader.onload = () => {
       const img = new Image();
       img.onerror = () => reject(new Error('not a valid image'));
-      img.onload = () => {
-        let { width: w, height: h } = img;
-        if (w > maxDim || h > maxDim) {
-          const scale = maxDim / Math.max(w, h);
-          w = Math.round(w * scale);
-          h = Math.round(h * scale);
-        }
-        const canvas = document.createElement('canvas');
-        canvas.width = w; canvas.height = h;
-        const ctx = canvas.getContext('2d');
-        ctx.fillStyle = '#fff';           // flatten transparency to white
-        ctx.fillRect(0, 0, w, h);
-        ctx.drawImage(img, 0, 0, w, h);
-        resolve(canvas.toDataURL('image/png'));
-      };
+      img.onload  = () => resolve(img);
       img.src = reader.result;
     };
     reader.readAsDataURL(file);
   });
+}
+
+// Render an image to a canvas at the given max dimension and encode it.
+function encodeAt(img, maxDim, mimeType, quality) {
+  let w = img.width, h = img.height;
+  if (w > maxDim || h > maxDim) {
+    const scale = maxDim / Math.max(w, h);
+    w = Math.round(w * scale);
+    h = Math.round(h * scale);
+  }
+  const canvas = document.createElement('canvas');
+  canvas.width = w; canvas.height = h;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#fff';          // flatten transparency to white
+  ctx.fillRect(0, 0, w, h);
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(img, 0, 0, w, h);
+  return { dataUri: canvas.toDataURL(mimeType, quality), width: w, mimeType };
+}
+
+// Try progressively stronger compression until the encoded data URI fits within
+// maxChars. PNG is tried first (crisp, ideal for screenshots of QR codes); if the
+// image is a photo, PNG stays large, so we fall back to JPEG at decreasing
+// size/quality. Returns null only if even the smallest setting won't fit.
+async function compressToFit(file, maxChars) {
+  const img = await loadImage(file);
+
+  const attempts = [
+    ['image/png',  512, undefined],
+    ['image/png',  400, undefined],
+    ['image/png',  320, undefined],
+    ['image/jpeg', 512, 0.9],
+    ['image/jpeg', 440, 0.85],
+    ['image/jpeg', 380, 0.8],
+    ['image/jpeg', 320, 0.75],
+    ['image/jpeg', 280, 0.7],
+    ['image/jpeg', 240, 0.65],
+    ['image/jpeg', 200, 0.6],
+  ];
+
+  for (const [mime, dim, q] of attempts) {
+    const out = encodeAt(img, dim, mime, q);
+    console.log('[QR] tried', mime, dim + 'px', '→', out.dataUri.length, 'chars');
+    if (out.dataUri.length <= maxChars) return out;
+  }
+  return null;
 }
 
 // ── CREATE / EDIT EVENT ──────────────────────────────────────
