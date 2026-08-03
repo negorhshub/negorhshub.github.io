@@ -482,13 +482,12 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // ── Payment QR ──
   const qrImg = document.getElementById('payment-qr-img');
+  const qrFallbackMsg = '<div class="w-40 h-40 flex items-center justify-center bg-gray-100 rounded-lg text-xs text-gray-400 text-center p-3">No QR code set for this event.<br/>Contact your coordinator.</div>';
+  qrImg.onerror = function() { this.outerHTML = qrFallbackMsg; };
   if (EVENT.qrCodeUrl) {
     qrImg.src = EVENT.qrCodeUrl;
   } else {
     qrImg.src = 'payment-qr.png';
-    qrImg.onerror = function() {
-      this.outerHTML = '<div class="w-40 h-40 flex items-center justify-center bg-gray-100 rounded-lg text-xs text-gray-400 text-center p-3">No QR set for this event.<br/>Contact your coordinator.</div>';
-    };
   }
   document.getElementById('payee-name-disp').textContent = EVENT.payeeName;
 
