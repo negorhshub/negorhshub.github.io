@@ -204,7 +204,7 @@
         <div class="flex flex-col sm:flex-row items-center gap-5 mt-3">
           <div class="text-center flex-shrink-0">
             <div class="bg-white rounded-xl border border-gray-200 p-2 inline-block">
-              <img id="payment-qr-img" alt="GCash / InstaPay QR" class="w-40 h-40 object-contain" src="" />
+              <img id="payment-qr-img" alt="GCash / InstaPay QR" class="w-40 h-40 object-contain" />
             </div>
             <p class="text-xs text-gray-500 mt-1">GCash / InstaPay</p>
             <p id="payee-name-disp" class="text-xs font-semibold mt-0.5" style="color:var(--ev)"></p>
@@ -482,12 +482,29 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // ── Payment QR ──
   const qrImg = document.getElementById('payment-qr-img');
-  const qrFallbackMsg = '<div class="w-40 h-40 flex items-center justify-center bg-gray-100 rounded-lg text-xs text-gray-400 text-center p-3">No QR code set for this event.<br/>Contact your coordinator.</div>';
-  qrImg.onerror = function() { this.outerHTML = qrFallbackMsg; };
-  if (EVENT.qrCodeUrl) {
-    qrImg.src = EVENT.qrCodeUrl;
-  } else {
+
+  // Diagnostic: log exactly what the server sent so we can tell
+  // "no QR stored" apart from "QR stored but won't render".
+  const rawQr = EVENT.qrCodeUrl || '';
+  console.log('[QR] length:', rawQr.length,
+              '| starts with:', rawQr.slice(0, 40) || '(empty)');
+
+  function qrFallback(reason) {
+    qrImg.outerHTML =
+      '<div class="w-40 h-40 flex flex-col items-center justify-center bg-gray-100 rounded-lg text-xs text-gray-400 text-center p-3">'
+      + '<span>' + reason + '</span>'
+      + '<span class="mt-1 text-[10px] text-gray-300">Contact your coordinator.</span>'
+      + '</div>';
+  }
+
+  if (!rawQr) {
+    // Nothing stored on the event at all — try the site-wide default QR.
+    qrImg.onerror = function() { qrFallback('No QR code set for this event.'); };
     qrImg.src = 'payment-qr.png';
+  } else {
+    // A value IS stored — if it fails, say so explicitly (different message).
+    qrImg.onerror = function() { qrFallback('QR code could not be loaded.'); };
+    qrImg.src = rawQr;
   }
   document.getElementById('payee-name-disp').textContent = EVENT.payeeName;
 
