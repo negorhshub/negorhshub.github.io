@@ -385,8 +385,9 @@ let coordToken    = '';
 let allEvents     = [];
 let allRegs       = [];
 let activeEventId = null;
-let qrFileData    = null;  // QR code for new event form
-let editEventId   = null;  // null = create mode, string = edit mode
+let qrFileData    = null;     // kept for reference only (no longer sent to server)
+let qrUploadedUrl = null;     // URL returned after QR is uploaded to Drive
+let editEventId   = null;     // null = create mode, string = edit mode
 
 // ── LOGIN ────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
@@ -555,15 +556,45 @@ async function updateStatus(eventId, newStatus) {
 // ── QR UPLOAD ────────────────────────────────────────────────
 function onQrSelect(input) {
   const f = input.files[0]; if (!f) return;
+  const zone    = document.getElementById('ne-qr-zone');
+  const preview = document.getElementById('ne-qr-preview');
+
+  // Show preview immediately from local file
+  const localUrl = URL.createObjectURL(f);
+  preview.src = localUrl;
+  preview.classList.remove('hidden');
+
+  // Show uploading state
+  zone.innerHTML = `<p class="text-sm font-medium text-amber-700">⏳ Uploading QR code…</p>
+                    <p class="text-xs text-gray-400 mt-1">${f.name}</p>`;
+  qrUploadedUrl = null;
+
   const reader = new FileReader();
-  reader.onload = e => {
-    qrFileData = { name: f.name, mimeType: f.type, base64: e.target.result.split(',')[1] };
-    const preview = document.getElementById('ne-qr-preview');
-    preview.src = e.target.result;
-    preview.classList.remove('hidden');
-    document.getElementById('ne-qr-zone').innerHTML =
-      `<p class="text-sm font-medium text-green-700">✅ ${f.name} selected</p>
-       <p class="text-xs text-gray-400 mt-1">Click to change</p>`;
+  reader.onload = async e => {
+    const base64 = e.target.result.split(',')[1];
+    try {
+      const resp = await post({
+        _type: 'uploadPhoto',
+        _token: coordToken,
+        category: 'qr',
+        base64,
+        mimeType: f.type,
+        fileName: f.name.replace(/\.[^.]+$/, ''),
+      });
+      if (resp.success && resp.url) {
+        qrUploadedUrl = resp.url;
+        zone.innerHTML = `<p class="text-sm font-medium text-green-700">✅ QR uploaded — ${f.name}</p>
+                          <p class="text-xs text-gray-400 mt-1">Click to change</p>`;
+      } else {
+        qrUploadedUrl = null;
+        zone.innerHTML = `<p class="text-sm font-medium text-red-600">❌ Upload failed — ${resp.error || 'unknown error'}</p>
+                          <p class="text-xs text-gray-400 mt-1">Click to try again</p>`;
+      }
+    } catch(err) {
+      qrUploadedUrl = null;
+      zone.innerHTML = `<p class="text-sm font-medium text-red-600">❌ Upload failed — network error</p>
+                        <p class="text-xs text-gray-400 mt-1">Click to try again</p>`;
+    }
   };
   reader.readAsDataURL(f);
 }
@@ -599,7 +630,8 @@ function openEditEvent(eventId) {
   document.getElementById('ne-payee').value          = ev['payee_name']        || '';
   document.getElementById('ne-photo-folder').value  = ev['photo_folder_url'] || '';
   document.getElementById('ne-desc').value           = ev['description']      || '';
-  qrFileData = null; // don't re-upload existing QR unless a new one is chosen
+  qrFileData    = null; // no longer used for upload
+  qrUploadedUrl = null; // only set if coordinator uploads a new QR in this session
   onRegTypeChange(); // show/hide split fields based on loaded type
 
   // Switch form to edit mode
@@ -652,7 +684,7 @@ async function saveNewEvent() {
         payeeName:        payee,
         description:      desc,
         photoFolderUrl:   photoFolder,
-        qrCode:           qrFileData,
+        ...(qrUploadedUrl ? { qrCodeUrl: qrUploadedUrl } : {}),
       });
     } else {
       resp = await post({
@@ -667,7 +699,7 @@ async function saveNewEvent() {
         payeeName:        payee,
         description:      desc,
         photoFolderUrl:   photoFolder,
-        qrCode:           qrFileData,
+        ...(qrUploadedUrl ? { qrCodeUrl: qrUploadedUrl } : {}),
       });
     }
 
@@ -683,8 +715,9 @@ async function saveNewEvent() {
       const regTypeEl = document.getElementById('ne-reg-type');
       if (regTypeEl) regTypeEl.value = 'per_family';
       onRegTypeChange(); // hide split fields
-      qrFileData = null;
-      editEventId = null;
+      qrFileData    = null;
+      qrUploadedUrl = null;
+      editEventId   = null;
       document.getElementById('ne-qr-preview').classList.add('hidden');
       document.getElementById('ne-qr-zone').innerHTML =
         '<p class="text-sm font-medium" style="color:var(--ev)">📷 Click to upload QR code image</p>' +
