@@ -495,6 +495,19 @@ function renderEvents() {
     const activateLabel = status === 'Closed' ? '▶ Reactivate' : '▶ Activate';
     const canClose    = status === 'Active';
 
+    // Photo archive visibility — only relevant once a photo folder is set
+    const hasFolder   = (ev['photo_folder_url'] || '').startsWith('http');
+    const archHidden  = ['yes','true'].includes(String(ev['hide_from_archive'] || '').toLowerCase());
+    const archBtn     = hasFolder
+      ? `<button onclick="toggleArchive('${ev['event_id']}', ${archHidden})" class="btn-sm"
+           style="${archHidden
+             ? 'background:#f3f4f6;color:#6b7280;border:1px solid #e5e7eb'
+             : 'background:#ecfdf5;color:#047857;border:1px solid #a7f3d0'}"
+           title="${archHidden ? 'Currently hidden from the public Photo Archive' : 'Currently visible in the public Photo Archive'}">
+           ${archHidden ? '🚫 Hidden from Archive' : '📷 In Photo Archive'}
+         </button>`
+      : '';
+
     return `
     <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
       <div class="flex flex-wrap items-start justify-between gap-3">
@@ -518,6 +531,7 @@ function renderEvents() {
         <div class="flex flex-wrap gap-2 flex-shrink-0">
           ${canActivate ? `<button onclick="updateStatus('${ev['event_id']}','Active')" class="btn-sm btn-activate">${activateLabel}</button>` : ''}
           ${canClose    ? `<button onclick="updateStatus('${ev['event_id']}','Closed')" class="btn-sm btn-close-ev">■ Close</button>` : ''}
+          ${archBtn}
           <button onclick="openEditEvent('${ev['event_id']}')" class="btn-sm" style="background:#f3f4f6;color:#374151;border:1px solid #e5e7eb">✏️ Edit</button>
           <button onclick="viewRegistrations('${ev['event_id']}')" class="btn-sm btn-view">👥 Registrations</button>
           ${status === 'Active' ? `<button onclick="copyLink('${regLink}','${ev['event_id']}')" class="btn-sm btn-copy" id="copy-btn-${ev['event_id']}">🔗 Copy Link</button>` : ''}
@@ -571,14 +585,15 @@ function onQrSelect(input) {
 
   (async () => {
     try {
-      // Compress the QR until the base64 data URI fits comfortably inside
-      // Google Sheets' 50,000-character-per-cell limit.
-      const result = await compressToFit(f, 44000);
+      // The image is stored in Drive (only a short link goes in the sheet), so we
+      // can keep it at high quality. The budget here is just to keep the upload
+      // fast and the registration page snappy — roughly 700 KB.
+      const result = await compressToFit(f, 950000);
 
       if (!result) {
         qrUploadedUrl = null;
-        zone.innerHTML = `<p class="text-sm font-medium text-red-600">❌ Could not compress this image enough</p>
-                          <p class="text-xs text-gray-400 mt-1">Crop tightly around just the QR square and re-upload.</p>`;
+        zone.innerHTML = `<p class="text-sm font-medium text-red-600">❌ Could not process this image</p>
+                          <p class="text-xs text-gray-400 mt-1">Try a different file, or crop around the QR square.</p>`;
         return;
       }
 
@@ -653,16 +668,16 @@ async function compressToFit(file, maxChars) {
   const img = await loadImage(file);
 
   const attempts = [
-    ['image/png',  512, undefined],
-    ['image/png',  400, undefined],
-    ['image/png',  320, undefined],
-    ['image/jpeg', 512, 0.9],
-    ['image/jpeg', 440, 0.85],
-    ['image/jpeg', 380, 0.8],
-    ['image/jpeg', 320, 0.75],
-    ['image/jpeg', 280, 0.7],
-    ['image/jpeg', 240, 0.65],
-    ['image/jpeg', 200, 0.6],
+    ['image/png',  1400, undefined],   // full quality — ideal for clean QR screenshots
+    ['image/png',  1000, undefined],
+    ['image/png',   800, undefined],
+    ['image/jpeg', 1400, 0.95],        // photos: PNG stays large, JPEG compresses well
+    ['image/jpeg', 1200, 0.92],
+    ['image/jpeg', 1000, 0.9],
+    ['image/jpeg',  800, 0.88],
+    ['image/jpeg',  640, 0.85],
+    ['image/jpeg',  512, 0.8],
+    ['image/jpeg',  400, 0.75],
   ];
 
   for (const [mime, dim, q] of attempts) {
@@ -807,6 +822,23 @@ async function saveNewEvent() {
   } finally {
     if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = isEdit ? 'Update Event' : 'Save as Draft'; }
   }
+}
+
+// ── PHOTO ARCHIVE VISIBILITY ─────────────────────────────────
+// Hiding is reversible and only affects the public Photo Archive list —
+// the event, its registrations and its Drive folder are all left untouched.
+async function toggleArchive(eventId, currentlyHidden) {
+  const hide = !currentlyHidden;
+  const msg  = hide
+    ? 'Hide this event from the public Photo Archive?\n\nThe Drive folder and all event data stay intact — you can unhide it anytime.'
+    : 'Show this event in the public Photo Archive again?';
+  if (!confirm(msg)) return;
+
+  try {
+    const resp = await post({ _type:'updateEvent', _token:coordToken, eventId, hideFromArchive: hide });
+    if (resp.success) { await loadEvents(); }
+    else              { alert('Could not update archive visibility: ' + (resp.error || 'Unknown error')); }
+  } catch(e) { alert('Network error. Please try again.'); }
 }
 
 // ── REG TYPE CHANGE ──────────────────────────────────────────

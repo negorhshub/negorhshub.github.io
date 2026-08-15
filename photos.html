@@ -79,6 +79,20 @@
 <!-- ═══ EVENT LIST ═══ -->
 <div class="max-w-4xl mx-auto px-4 pb-12">
 
+  <!-- Quarter picker -->
+  <div id="quarter-bar" class="hidden mb-5 flex flex-wrap items-center justify-between gap-3">
+    <div>
+      <p id="quarter-heading" class="text-sm font-bold text-gray-800"></p>
+      <p class="text-xs text-gray-400 mt-0.5">Photo folders stay available after an event closes.</p>
+    </div>
+    <div class="flex items-center gap-2">
+      <label for="quarter-select" class="text-xs text-gray-500">Quarter</label>
+      <select id="quarter-select" onchange="loadEvents(this.value)"
+              class="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white outline-none"
+              style="min-width:190px"></select>
+    </div>
+  </div>
+
   <!-- Loading -->
   <div id="events-loading" class="text-center py-16 text-gray-400">
     <div class="text-4xl mb-2 animate-pulse">📂</div>
@@ -130,20 +144,37 @@
 <script>
 const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyAccFyFzcNgGN2FdiyACxSBvTxIdVy3M0lPSEsph17vrhzzY5cbFvQGDCTQXtSK_G__w/exec';
 
-async function loadEvents() {
+async function loadEvents(quarter) {
+  const loading = document.getElementById('events-loading');
+  const empty   = document.getElementById('events-empty');
+  const grid    = document.getElementById('events-grid');
+
+  loading.classList.remove('hidden');
+  empty.classList.add('hidden');
+  grid.classList.add('hidden');
+
   try {
-    // Use getActiveEvents (public) but also try to show closed events with folders
-    const res  = await fetch(APPS_SCRIPT_URL + '?action=getActiveEvents');
+    // getArchiveEvents returns events of ANY status that have a photo folder and
+    // haven't been hidden by a coordinator, grouped into school-year quarters.
+    const params = new URLSearchParams({ action: 'getArchiveEvents' });
+    if (quarter) params.set('quarter', quarter);
+    const res  = await fetch(APPS_SCRIPT_URL + '?' + params.toString());
     const data = await res.json();
     const events = (data.success && data.data) ? data.data : [];
-    document.getElementById('events-loading').classList.add('hidden');
+
+    renderQuarterBar(data);
+    loading.classList.add('hidden');
 
     if (events.length === 0) {
-      document.getElementById('events-empty').classList.remove('hidden');
+      empty.classList.remove('hidden');
+      document.getElementById('events-empty').innerHTML = `
+        <div class="text-4xl mb-3">📭</div>
+        <p class="font-medium text-gray-600 mb-1">No photo folders this quarter</p>
+        <p class="text-sm">Try another quarter, or check back after our next activity!</p>`;
       return;
     }
 
-    document.getElementById('events-grid').classList.remove('hidden');
+    grid.classList.remove('hidden');
     document.getElementById('events-loaded').classList.remove('hidden');
 
     document.getElementById('events-grid').innerHTML = events.map(function(ev) {
@@ -197,6 +228,25 @@ async function loadEvents() {
       <p class="font-medium text-gray-600 mb-1">Couldn't load events</p>
       <p class="text-sm">Check your connection and refresh.</p>`;
   }
+}
+
+// Populate the quarter dropdown and heading from the server response.
+function renderQuarterBar(data) {
+  const bar   = document.getElementById('quarter-bar');
+  const sel   = document.getElementById('quarter-select');
+  const head  = document.getElementById('quarter-heading');
+  const list  = data.quarters || [];
+
+  if (list.length === 0) { bar.classList.add('hidden'); return; }
+
+  bar.classList.remove('hidden');
+  sel.innerHTML = list.map(function(q) {
+    const isCurrent = q.key === data.currentQuarter;
+    return `<option value="${escHtml(q.key)}" ${q.key === data.selected ? 'selected' : ''}>`
+         + `${escHtml(q.label)}${isCurrent ? ' — current' : ''}</option>`;
+  }).join('');
+
+  head.textContent = data.selectedLabel || 'Photo Archive';
 }
 
 function fmtDate(d) {

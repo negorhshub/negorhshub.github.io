@@ -497,43 +497,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       + '</div>';
   }
 
-  // Build an ordered list of candidate sources to try.
-  // Google Drive serves images under several different URL shapes and which one
-  // works has changed over time, so we try each in turn rather than betting on one.
-  function qrCandidates(value) {
-    if (!value) return ['payment-qr.png'];
-    if (value.indexOf('data:') === 0) return [value];   // data URI — use as-is
-
-    // Pull a Drive file ID out of whatever URL shape was stored.
-    var m = value.match(/[-\w]{25,}/);
-    var id = m ? m[0] : null;
-    if (!id) return [value, 'payment-qr.png'];
-
-    return [
-      'https://lh3.googleusercontent.com/d/' + id,
-      'https://drive.google.com/thumbnail?id=' + id + '&sz=w800',
-      'https://drive.google.com/uc?export=view&id=' + id,
-      value,
-      'payment-qr.png',
-    ];
-  }
-
-  const candidates = qrCandidates(rawQr);
-  let attempt = 0;
-
-  function tryNextQr() {
-    if (attempt >= candidates.length) {
-      qrFallback(rawQr ? 'QR code could not be loaded.' : 'No QR code set for this event.');
-      return;
-    }
-    const src = candidates[attempt++];
-    console.log('[QR] trying source', attempt + '/' + candidates.length + ':', src.slice(0, 60));
-    qrImg.src = src;
-  }
-
-  qrImg.onerror = tryNextQr;
-  qrImg.onload  = function() { console.log('[QR] loaded successfully'); };
-  tryNextQr();
+  loadEventQr(qrImg, rawQr, EVENT.id, qrFallback);
   document.getElementById('payee-name-disp').textContent = EVENT.payeeName;
 
   // ── Show form ──
@@ -543,6 +507,44 @@ document.addEventListener('DOMContentLoaded', async () => {
   updateProg();
   updateFee(); // initial fee summary
 });
+
+// ─── QR LOADING ─────────────────────────────────────────────
+// The sheet stores only a short Drive link, so the image bytes are fetched
+// through the Apps Script getEventQr endpoint and rendered as a data URI.
+// That avoids Google Drive's inconsistent hotlinking behaviour entirely.
+async function loadEventQr(qrImg, rawQr, eventId, onFail) {
+  // Value already contains the image data (stored by an earlier version)
+  if (rawQr && rawQr.indexOf('data:') === 0) {
+    qrImg.onerror = () => onFail('QR code could not be loaded.');
+    qrImg.src = rawQr;
+    return;
+  }
+
+  if (rawQr) {
+    try {
+      const params = new URLSearchParams({ action: 'getEventQr', eventId });
+      const res    = await fetch(APPS_SCRIPT_URL + '?' + params.toString());
+      const data   = await res.json();
+      if (data.success && data.dataUri) {
+        qrImg.onerror = () => onFail('QR code could not be loaded.');
+        qrImg.src = data.dataUri;
+        return;
+      }
+      console.warn('[QR] getEventQr failed:', data.error);
+    } catch(err) {
+      console.warn('[QR] getEventQr request failed:', err);
+    }
+
+    // Fall back to loading the stored link directly
+    qrImg.onerror = () => onFail('QR code could not be loaded.');
+    qrImg.src = rawQr;
+    return;
+  }
+
+  // Nothing stored — try the site-wide default QR
+  qrImg.onerror = () => onFail('No QR code set for this event.');
+  qrImg.src = 'payment-qr.png';
+}
 
 // ─── EVENT PICKER (no ?event= in URL) ───────────────────────
 async function showEventPicker() {
