@@ -199,7 +199,7 @@
           <!-- Fee and Registration Type -->
           <div>
             <label class="label" id="ne-fee-label">Registration Fee (₱) <span class="text-red-500">*</span></label>
-            <input id="ne-fee" type="number" class="inp" placeholder="e.g., 200" min="0" />
+            <input id="ne-fee" type="number" class="inp" placeholder="e.g., 200" min="0" oninput="renderBracketPreview()" />
           </div>
           <div>
             <label class="label">Fee is charged</label>
@@ -208,24 +208,41 @@
               <option value="per_adult">Per adult</option>
               <option value="per_child">Per child</option>
               <option value="per_pax">Per person (adults + children)</option>
-              <option value="adult_child_split">Different rates for adults &amp; children</option>
+              <option value="age_brackets">Different fee per age group</option>
             </select>
           </div>
 
-          <!-- Split pricing fields — shown only for adult_child_split -->
-          <div id="ne-split-fields" class="sm:col-span-2 hidden">
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 rounded-xl p-4" style="background:#fffbeb;border:1px solid #fcd34d">
-              <div>
-                <label class="label">Child Fee (₱) <span class="text-red-500">*</span></label>
-                <input id="ne-child-fee" type="number" class="inp" placeholder="e.g., 80" min="0" />
-              </div>
-              <div>
-                <label class="label">Free for children aged ___ &amp; under <span class="text-gray-400 font-normal">(0 = no free tier)</span></label>
-                <input id="ne-free-age-max" type="number" class="inp" placeholder="e.g., 6" min="0" max="17" value="0" />
-              </div>
-              <p class="sm:col-span-2 text-xs" style="color:#92400e">
-                ℹ️ The <strong>Registration Fee</strong> above becomes the <strong>adult fee</strong>. Children at or below the free-age threshold attend for free but are still counted.
+          <!-- Age bracket pricing — shown only for age_brackets -->
+          <div id="ne-bracket-fields" class="sm:col-span-2 hidden">
+            <div class="rounded-xl p-4" style="background:#fffbeb;border:1px solid #fcd34d">
+              <p class="text-xs mb-3" style="color:#92400e">
+                ℹ️ The <strong>Adult Fee</strong> above applies to each parent / guardian.
+                Set the fee for each child age group below. Enter <strong>0</strong> for a free age group —
+                those children are still recorded as attending.
               </p>
+
+              <div class="flex items-center justify-between mb-2">
+                <p class="text-xs font-bold uppercase tracking-wide" style="color:#92400e">Children — fee by age</p>
+                <span class="text-xs text-gray-400">Age range is inclusive</span>
+              </div>
+
+              <!-- Column headers -->
+              <div class="grid gap-2 mb-1" style="grid-template-columns:1fr 1fr 1.2fr 32px">
+                <span class="text-xs text-gray-500">From age</span>
+                <span class="text-xs text-gray-500">To age</span>
+                <span class="text-xs text-gray-500">Fee (₱)</span>
+                <span></span>
+              </div>
+
+              <div id="ne-brackets" class="space-y-2"></div>
+
+              <button type="button" onclick="addBracket()"
+                      class="mt-3 w-full flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-medium"
+                      style="border:2px dashed #d97706; color:#b45309; background:transparent">
+                + Add age group
+              </button>
+
+              <p id="ne-bracket-preview" class="text-xs mt-3" style="color:#92400e"></p>
             </div>
           </div>
 
@@ -713,9 +730,31 @@ function openEditEvent(eventId) {
   document.getElementById('ne-end-time').value   = ev['end_time']                                 || '';
   document.getElementById('ne-venue').value      = ev['venue']                                    || '';
   document.getElementById('ne-fee').value           = ev['fee_₱'] ?? ev['fee_(₱)'] ?? ev['fee'] ?? '';
-  document.getElementById('ne-reg-type').value      = ev['registration_type']  || 'per_family';
-  document.getElementById('ne-child-fee').value     = ev['child_fee_₱'] || ev['child_fee'] || '';
-  document.getElementById('ne-free-age-max').value  = ev['free_age_max'] ?? 0;
+
+  // Load age brackets, migrating older adult_child_split events into the
+  // equivalent brackets so they can be edited with the same UI.
+  const regTypeEl = document.getElementById('ne-reg-type');
+  document.getElementById('ne-brackets').innerHTML = '';
+  let storedType = ev['registration_type'] || 'per_family';
+
+  if (storedType === 'adult_child_split') {
+    const childFee   = parseFloat(ev['child_fee_₱'] || ev['child_fee'] || 0) || 0;
+    const freeAgeMax = parseInt(ev['free_age_max'] || 0) || 0;
+    if (freeAgeMax > 0) {
+      addBracket(0, freeAgeMax, 0);
+      addBracket(freeAgeMax + 1, 25, childFee);
+    } else {
+      addBracket(0, 25, childFee);
+    }
+    storedType = 'age_brackets';
+  } else if (storedType === 'age_brackets') {
+    let list = [];
+    try { list = JSON.parse(ev['fee_brackets_json'] || ev['fee_brackets'] || '[]') || []; }
+    catch(e) { list = []; }
+    list.forEach(b => addBracket(b.min, b.max, b.fee));
+  }
+
+  regTypeEl.value = storedType;
   document.getElementById('ne-payee').value          = ev['payee_name']        || '';
   document.getElementById('ne-photo-folder').value  = ev['photo_folder_url'] || '';
   document.getElementById('ne-desc').value           = ev['description']      || '';
@@ -740,8 +779,7 @@ async function saveNewEvent() {
   const venue    = (document.getElementById('ne-venue')?.value  || '').trim();
   const feeRaw       = (document.getElementById('ne-fee')?.value          || '').trim();
   const regType      = (document.getElementById('ne-reg-type')?.value     || 'per_family');
-  const childFeeRaw  = (document.getElementById('ne-child-fee')?.value    || '').trim();
-  const freeAgeMax   = parseInt(document.getElementById('ne-free-age-max')?.value || '0') || 0;
+  const brackets     = regType === 'age_brackets' ? collectBrackets() : [];
   const payee        = (document.getElementById('ne-payee')?.value        || '').trim();
   const desc         = (document.getElementById('ne-desc')?.value         || '').trim();
   const photoFolder  = (document.getElementById('ne-photo-folder')?.value || '').trim();
@@ -751,8 +789,13 @@ async function saveNewEvent() {
   if (!title)        return showErr('Event title is required.');
   if (!date)         return showErr('Event date is required.');
   if (!venue)        return showErr('Venue is required.');
-  if (feeRaw === '') return showErr('Registration fee is required. Enter 0 for free events.');
-  if (regType === 'adult_child_split' && childFeeRaw === '') return showErr('Child fee is required for split pricing. Enter 0 if children are free.');
+  if (feeRaw === '') return showErr(regType === 'age_brackets'
+        ? 'Adult fee is required. Enter 0 if adults attend free.'
+        : 'Registration fee is required. Enter 0 for free events.');
+  if (regType === 'age_brackets') {
+    const bErr = validateBrackets(brackets);
+    if (bErr) return showErr(bErr);
+  }
 
   const saveBtn = document.getElementById('ne-save-btn');
   if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = 'Saving…'; }
@@ -768,8 +811,7 @@ async function saveNewEvent() {
         endTime:          (document.getElementById('ne-end-time')?.value   || ''),
         fee:              parseFloat(feeRaw) || 0,
         registrationType: regType,
-        childFee:         regType === 'adult_child_split' ? (parseFloat(childFeeRaw) || 0) : 0,
-        freeAgeMax:       regType === 'adult_child_split' ? freeAgeMax : 0,
+        feeBrackets:      regType === 'age_brackets' ? JSON.stringify(brackets) : '',
         payeeName:        payee,
         description:      desc,
         photoFolderUrl:   photoFolder,
@@ -783,8 +825,7 @@ async function saveNewEvent() {
         endTime:          (document.getElementById('ne-end-time')?.value   || ''),
         fee:              parseFloat(feeRaw) || 0,
         registrationType: regType,
-        childFee:         regType === 'adult_child_split' ? (parseFloat(childFeeRaw) || 0) : 0,
-        freeAgeMax:       regType === 'adult_child_split' ? freeAgeMax : 0,
+        feeBrackets:      regType === 'age_brackets' ? JSON.stringify(brackets) : '',
         payeeName:        payee,
         description:      desc,
         photoFolderUrl:   photoFolder,
@@ -794,11 +835,10 @@ async function saveNewEvent() {
 
     if (resp.success) {
       // Reset form
-      ['ne-title','ne-date','ne-start-time','ne-end-time','ne-venue','ne-fee','ne-child-fee','ne-photo-folder','ne-desc'].forEach(id => {
+      ['ne-title','ne-date','ne-start-time','ne-end-time','ne-venue','ne-fee','ne-photo-folder','ne-desc'].forEach(id => {
         const el = document.getElementById(id); if (el) el.value = '';
       });
-      const freeAgeEl = document.getElementById('ne-free-age-max');
-      if (freeAgeEl) freeAgeEl.value = '0';
+      document.getElementById('ne-brackets').innerHTML = '';
       const payeeEl = document.getElementById('ne-payee');
       if (payeeEl) payeeEl.value = 'Debbie Uy Matiao';
       const regTypeEl = document.getElementById('ne-reg-type');
@@ -843,16 +883,89 @@ async function toggleArchive(eventId, currentlyHidden) {
 
 // ── REG TYPE CHANGE ──────────────────────────────────────────
 function onRegTypeChange() {
-  const type       = document.getElementById('ne-reg-type').value;
-  const splitFields = document.getElementById('ne-split-fields');
-  const feeLabel   = document.getElementById('ne-fee-label');
-  if (type === 'adult_child_split') {
-    splitFields.classList.remove('hidden');
+  const type      = document.getElementById('ne-reg-type').value;
+  const brFields  = document.getElementById('ne-bracket-fields');
+  const feeLabel  = document.getElementById('ne-fee-label');
+
+  if (type === 'age_brackets') {
+    brFields.classList.remove('hidden');
     feeLabel.innerHTML = 'Adult Fee (₱) <span class="text-red-500">*</span>';
+    // Start with one empty row so the editor isn't blank
+    if (!document.querySelector('#ne-brackets .bracket-row')) addBracket();
+    renderBracketPreview();
   } else {
-    splitFields.classList.add('hidden');
+    brFields.classList.add('hidden');
     feeLabel.innerHTML = 'Registration Fee (₱) <span class="text-red-500">*</span>';
   }
+}
+
+// ── AGE BRACKET EDITOR ───────────────────────────────────────
+function addBracket(min, max, fee) {
+  const wrap = document.getElementById('ne-brackets');
+  const row  = document.createElement('div');
+  row.className = 'bracket-row grid gap-2 items-center';
+  row.style.gridTemplateColumns = '1fr 1fr 1.2fr 32px';
+  row.innerHTML = `
+    <input type="number" class="inp b-min" min="0" max="25" placeholder="0"
+           value="${min !== undefined ? min : ''}" oninput="renderBracketPreview()" />
+    <input type="number" class="inp b-max" min="0" max="25" placeholder="5"
+           value="${max !== undefined ? max : ''}" oninput="renderBracketPreview()" />
+    <input type="number" class="inp b-fee" min="0" placeholder="200"
+           value="${fee !== undefined ? fee : ''}" oninput="renderBracketPreview()" />
+    <button type="button" onclick="this.parentElement.remove(); renderBracketPreview();"
+            class="text-red-500 hover:text-red-700 text-sm" title="Remove this age group">✕</button>`;
+  wrap.appendChild(row);
+}
+
+/** Read the bracket rows into a sorted array. Blank rows are ignored. */
+function collectBrackets() {
+  return [...document.querySelectorAll('#ne-brackets .bracket-row')].map(r => {
+    const min = r.querySelector('.b-min').value.trim();
+    const max = r.querySelector('.b-max').value.trim();
+    const fee = r.querySelector('.b-fee').value.trim();
+    if (min === '' && max === '' && fee === '') return null;   // untouched row
+    return { min: parseInt(min), max: parseInt(max), fee: parseFloat(fee) };
+  }).filter(Boolean).sort((a, b) => a.min - b.min);
+}
+
+/** Validate brackets; returns an error string, or '' when they're fine. */
+function validateBrackets(list) {
+  if (list.length === 0) return 'Add at least one age group, or choose a different fee type.';
+  for (const b of list) {
+    if (isNaN(b.min) || isNaN(b.max)) return 'Every age group needs both a "From age" and a "To age".';
+    if (isNaN(b.fee))                 return 'Every age group needs a fee. Enter 0 if that group is free.';
+    if (b.min > b.max)                return `Age group ${b.min}–${b.max} is backwards — "From age" must not exceed "To age".`;
+  }
+  for (let i = 1; i < list.length; i++) {
+    if (list[i].min <= list[i - 1].max) {
+      return `Age groups ${list[i-1].min}–${list[i-1].max} and ${list[i].min}–${list[i].max} overlap. Each age should fall in only one group.`;
+    }
+  }
+  return '';
+}
+
+/** Live plain-English summary under the editor. */
+function renderBracketPreview() {
+  const el = document.getElementById('ne-bracket-preview');
+  if (!el) return;
+  const list = collectBrackets();
+  const err  = validateBrackets(list);
+
+  if (err) { el.innerHTML = `<span style="color:#b91c1c">⚠️ ${err}</span>`; return; }
+
+  const adult = parseFloat(document.getElementById('ne-fee')?.value || '0') || 0;
+  const parts = list.map(b =>
+    `ages ${b.min}–${b.max}: ${b.fee === 0 ? 'Free' : '₱' + b.fee.toLocaleString()}`);
+
+  // Warn about ages that fall outside every bracket
+  const gaps = [];
+  if (list[0].min > 0) gaps.push(`0–${list[0].min - 1}`);
+  for (let i = 1; i < list.length; i++) {
+    if (list[i].min > list[i-1].max + 1) gaps.push(`${list[i-1].max + 1}–${list[i].min - 1}`);
+  }
+
+  el.innerHTML = `✅ Adults: ₱${adult.toLocaleString()} · ${parts.join(' · ')}`
+    + (gaps.length ? `<br><span style="color:#b45309">⚠️ No fee set for ages ${gaps.join(', ')} — children in those ages would be charged ₱0.</span>` : '');
 }
 
 // ── COPY LINK ────────────────────────────────────────────────

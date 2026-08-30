@@ -435,6 +435,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       fee:              parseFloat(ev['fee_₱'] || ev['fee_(₱)'] || ev['fee'] || 0),
       childFee:         parseFloat(ev['child_fee_₱'] || ev['child_fee'] || 0),
       freeAgeMax:       parseInt(ev['free_age_max'] || 0) || 0,
+      feeBrackets:      parseBrackets(ev['fee_brackets_json'] || ev['fee_brackets']),
       payeeName:        ev['payee_name']         || 'Debbie Uy Matiao',
       description:      ev['description']        || '',
       registrationType: ev['registration_type'] || 'per_family',
@@ -452,8 +453,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     ? (EVENT.endTime ? `${fmtTime(EVENT.startTime)} – ${fmtTime(EVENT.endTime)}` : fmtTime(EVENT.startTime))
     : '';
 
-  const feeStr = (EVENT.fee > 0 || EVENT.childFee > 0)
-    ? (EVENT.registrationType === 'adult_child_split'
+  const anyBracketFee = (EVENT.feeBrackets || []).some(b => b.fee > 0);
+  const feeStr = (EVENT.fee > 0 || EVENT.childFee > 0 || anyBracketFee)
+    ? (EVENT.registrationType === 'age_brackets'
+        ? '₱' + EVENT.fee.toLocaleString() + ' per adult'
+          + (EVENT.feeBrackets || []).map(b =>
+              ' · ages ' + b.min + '–' + b.max + ': ' + (b.fee === 0 ? 'Free' : '₱' + b.fee.toLocaleString())
+            ).join('')
+      : EVENT.registrationType === 'adult_child_split'
         ? '₱' + EVENT.fee.toLocaleString() + ' per adult / ₱' + EVENT.childFee.toLocaleString() + ' per child'
           + (EVENT.freeAgeMax > 0 ? ' (age ' + EVENT.freeAgeMax + ' &amp; under free)' : '')
         : '₱' + EVENT.fee.toLocaleString() + ' ' + (
@@ -507,6 +514,28 @@ document.addEventListener('DOMContentLoaded', async () => {
   updateProg();
   updateFee(); // initial fee summary
 });
+
+// ─── AGE BRACKET HELPERS ────────────────────────────────────
+/** Parse the stored bracket JSON into a clean, sorted array. */
+function parseBrackets(raw) {
+  if (!raw) return [];
+  try {
+    const list = JSON.parse(raw);
+    if (!Array.isArray(list)) return [];
+    return list
+      .map(b => ({ min: parseInt(b.min), max: parseInt(b.max), fee: parseFloat(b.fee) }))
+      .filter(b => !isNaN(b.min) && !isNaN(b.max) && !isNaN(b.fee))
+      .sort((a, b) => a.min - b.min);
+  } catch(e) {
+    console.warn('[fee] could not parse fee brackets:', e);
+    return [];
+  }
+}
+
+/** Find the bracket an age falls into, or null if none covers it. */
+function bracketForAge(brackets, age) {
+  return brackets.find(b => age >= b.min && age <= b.max) || null;
+}
 
 // ─── QR LOADING ─────────────────────────────────────────────
 // The sheet stores only a short Drive link, so the image bytes are fetched
@@ -657,6 +686,7 @@ function addParent() {
       </div>
     </div>`;
   document.getElementById('parents-wrap').appendChild(d);
+  updateFee();
 }
 
 function addChild() {
@@ -676,13 +706,14 @@ function addChild() {
       </div>
       <div>
         <label class="label">Age <span class="text-red-500">*</span></label>
-        <input name="c_age" type="number" class="inp" placeholder="e.g., 8" min="0" max="25" required/>
+        <input name="c_age" type="number" class="inp" placeholder="e.g., 8" min="0" max="25" required oninput="updateFee()"/>
       </div>
     </div>`;
   document.getElementById('children-wrap').appendChild(d);
+  updateFee();
 }
 
-function removeEl(id) { document.getElementById(id)?.remove(); }
+function removeEl(id) { document.getElementById(id)?.remove(); updateFee(); }
 
 // ─── FEE CALCULATION ────────────────────────────────────────
 function updateFee() {
@@ -710,6 +741,49 @@ function updateFee() {
       desc  = `₱${EVENT.fee.toLocaleString()} × ${adults + kids} pax`;
       label = `₱${EVENT.fee.toLocaleString()} per person`;
       break;
+    case 'age_brackets': {
+      const brackets = EVENT.feeBrackets || [];
+      const adultTotal = EVENT.fee * adults;
+
+      // Tally each child into its age bracket
+      const tally = new Map();   // bracket index -> count
+      let uncovered = 0;
+      [...document.querySelectorAll('#children-wrap > div')].forEach(d => {
+        const ageRaw = d.querySelector('[name="c_age"]')?.value;
+        if (ageRaw === '' || ageRaw == null) return;   // age not entered yet
+        const age = parseInt(ageRaw);
+        if (isNaN(age)) return;
+        const b = bracketForAge(brackets, age);
+        if (!b) { uncovered++; return; }
+        const i = brackets.indexOf(b);
+        tally.set(i, (tally.get(i) || 0) + 1);
+      });
+
+      let kidTotal = 0;
+      const parts = [];
+      if (adults > 0) {
+        parts.push(`₱${EVENT.fee.toLocaleString()} × ${adults} adult${adults !== 1 ? 's' : ''} = ₱${adultTotal.toLocaleString()}`);
+      }
+      brackets.forEach((b, i) => {
+        const n = tally.get(i) || 0;
+        if (n === 0) return;
+        const sub = b.fee * n;
+        kidTotal += sub;
+        const who = `${n} child${n !== 1 ? 'ren' : ''} age ${b.min}–${b.max}`;
+        parts.push(b.fee === 0 ? `${who} — Free` : `₱${b.fee.toLocaleString()} × ${who} = ₱${sub.toLocaleString()}`);
+      });
+      if (uncovered > 0) {
+        parts.push(`${uncovered} child${uncovered !== 1 ? 'ren' : ''} outside any age group — ₱0`);
+      }
+      if (parts.length === 0) parts.push('No attendees added yet');
+
+      total = adultTotal + kidTotal;
+      desc  = parts.join('<br>');
+      label = `₱${EVENT.fee.toLocaleString()} adult`
+            + (brackets.length ? ' · ' + brackets.map(b =>
+                `${b.min}–${b.max}: ${b.fee === 0 ? 'Free' : '₱' + b.fee.toLocaleString()}`).join(' · ') : '');
+      break;
+    }
     case 'adult_child_split': {
       const freeMax  = EVENT.freeAgeMax || 0;
       const childFee = EVENT.childFee   || 0;
@@ -878,10 +952,16 @@ function collect() {
 // ─── SUBMISSION ──────────────────────────────────────────────
 
 function updatePaymentCard() {
-  // Show payment card if the event has any fee at all (adult or child)
-  const fee  = EVENT ? ((parseFloat(EVENT.fee) || 0) + (parseFloat(EVENT.childFee) || 0)) : 1;
+  // Show the payment card if the event can charge anything at all —
+  // base fee, legacy child fee, or any non-zero age bracket.
+  let chargeable = 1;
+  if (EVENT) {
+    chargeable = (parseFloat(EVENT.fee) || 0)
+               + (parseFloat(EVENT.childFee) || 0)
+               + (EVENT.feeBrackets || []).reduce((s, b) => s + (b.fee || 0), 0);
+  }
   const card = document.getElementById('payment-card');
-  if (card) card.style.display = fee > 0 ? '' : 'none';
+  if (card) card.style.display = chargeable > 0 ? '' : 'none';
 }
 
 async function submitForm() {
