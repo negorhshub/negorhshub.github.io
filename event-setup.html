@@ -737,21 +737,32 @@ function openEditEvent(eventId) {
   document.getElementById('ne-brackets').innerHTML = '';
   let storedType = ev['registration_type'] || 'per_family';
 
-  if (storedType === 'adult_child_split') {
+  // Seed bracket rows from the legacy child-fee fields.
+  // Used both for older adult_child_split events and for age_brackets events
+  // that were saved before bracket storage existed (otherwise they'd open with
+  // no brackets, and validation would block every save).
+  function seedBracketsFromLegacy() {
     const childFee   = parseFloat(ev['child_fee_₱'] || ev['child_fee'] || 0) || 0;
     const freeAgeMax = parseInt(ev['free_age_max'] || 0) || 0;
     if (freeAgeMax > 0) {
       addBracket(0, freeAgeMax, 0);
       addBracket(freeAgeMax + 1, 25, childFee);
-    } else {
+    } else if (childFee > 0) {
       addBracket(0, 25, childFee);
+    } else {
+      addBracket();   // blank row for the coordinator to fill in
     }
+  }
+
+  if (storedType === 'adult_child_split') {
+    seedBracketsFromLegacy();
     storedType = 'age_brackets';
   } else if (storedType === 'age_brackets') {
     let list = [];
     try { list = JSON.parse(ev['fee_brackets_json'] || ev['fee_brackets'] || '[]') || []; }
     catch(e) { list = []; }
-    list.forEach(b => addBracket(b.min, b.max, b.fee));
+    if (list.length) list.forEach(b => addBracket(b.min, b.max, b.fee));
+    else             seedBracketsFromLegacy();
   }
 
   regTypeEl.value = storedType;
@@ -794,7 +805,17 @@ async function saveNewEvent() {
         : 'Registration fee is required. Enter 0 for free events.');
   if (regType === 'age_brackets') {
     const bErr = validateBrackets(brackets);
-    if (bErr) return showErr(bErr);
+    if (bErr) {
+      // Make it obvious *where* the problem is — otherwise the save just
+      // appears to do nothing when the blocking field is scrolled out of view.
+      const bf = document.getElementById('ne-bracket-fields');
+      if (bf) {
+        bf.classList.remove('hidden');
+        bf.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+      renderBracketPreview();
+      return showErr('Cannot save — fee by age needs fixing:\n\n' + bErr);
+    }
   }
 
   const saveBtn = document.getElementById('ne-save-btn');
